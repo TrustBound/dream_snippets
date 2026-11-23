@@ -65,9 +65,11 @@ pub fn summary_of(directory: String) -> List(String) {
 
 For the example project with one guide, `docs/guides/usage.md`, whose `gleam` block on line 5 has no badge, `summary_of` returns these two lines:
 
+### The lines that summary_of returns <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_use_from_gleam_summary.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 docs/guides/usage.md:5: this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)
-1 block and 0 diff blocks checked in 1 file, 1 problem
+1 block and 0 diff blocks checked in 1 file, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 `check_project` returns a `ProjectReport` with the project, the merged `Report` of every file, and the number of files checked. The paths in the problems are relative to the directory you give it. `output` gives an `Output` with `standard_output`, `standard_error` and `exit_status`: 0 with no problems, and 1 otherwise.
@@ -127,6 +129,8 @@ fn annotation(problem: Problem, project: Project) -> String {
 
 For the project of Step 1, it returns:
 
+### The annotations of the project <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_use_from_gleam_annotations.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 Ok(["::error file=docs/guides/usage.md,line=5::this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)"])
 ```
@@ -155,6 +159,8 @@ pub fn check_guide(guide: String) -> Report {
       badge_guide: "CONTRIBUTING.md",
       release_notes_guide: "CONTRIBUTING.md",
       guides: ["docs/guides"],
+      tested_files: ["test", ".github"],
+      dependencies: [],
     )
   let context =
     CheckContext(
@@ -172,7 +178,7 @@ pub fn check_guide(guide: String) -> Report {
 }
 ```
 
-For a guide whose only block, on line 3, has no heading, it returns `Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [Problem("docs/guide.md", 3, MissingBadgeHeading)])`.
+For a guide whose only block, on line 3, has no heading, it returns `Report(..check.empty_report(), blocks_checked: 1, problems: [Problem("docs/guide.md", 3, MissingBadgeHeading)])`.
 
 The git functions here always fail with `GitNotFound`, which is fine for documents of the current version with no diff blocks and no old code. For a test of those, give lookups in a list: `tag_exists: fn(tag) { Ok(tag == "1.1.0") }`, and `file_at_tag` returning `Ok(Some(text))` for a file and `Ok(None)` for none.
 
@@ -234,7 +240,7 @@ pub fn context_for(directory: String, configuration: Config) -> CheckContext {
 }
 ```
 
-In a project with the tag `0.1.0`, `context.tag_exists("0.1.0")` returns `Ok(True)`. With the snippet of [Getting started](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/getting-started.md) in the project, `check.check_markdown` on a guide that shows it returns `Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [])`.
+In a project with the tag `0.1.0`, `context.tag_exists("0.1.0")` returns `Ok(True)`. With the snippet of [Getting started](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/getting-started.md) in the project, `check.check_markdown` on a guide that shows it returns `Report(..check.empty_report(), blocks_checked: 1, problems: [])`.
 
 `git.run` is the function under the three: it runs git with a list of arguments and returns its standard output. The check never gives it a tag or a path that fails `check.is_safe_tag` or `check.is_safe_path`, and you shouldn't either.
 
@@ -244,17 +250,23 @@ Some problems aren't about a code block: `gleam.toml` can't be used, or a file c
 
 A root that `[tools.dream_snippets]` sets but that doesn't exist, `MissingRoot("docs")`:
 
+### The error of a missing root <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_use_from_gleam_missing_root.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 error: docs is set in [tools.dream_snippets] in gleam.toml, but it does not exist
 ```
 
 A setting the check doesn't know, here `guide` instead of `guides`:
 
+### The error of an unknown setting <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_use_from_gleam_unknown_setting.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
-error: tools.dream_snippets.guide in gleam.toml is not a setting; the settings are markdown, changelog, release_notes, gleam_source, checked_from_version, guides, badge_guide, release_notes_guide
+error: tools.dream_snippets.guide in gleam.toml is not a setting; the settings are markdown, changelog, release_notes, gleam_source, checked_from_version, guides, badge_guide, release_notes_guide, tested_files
 ```
 
 For a directory with no `gleam.toml`, `annotations` from [Step 3](#step-3-print-problems-your-own-way) returns an `Error`, and `describe_error` gives:
+
+### The description of a missing gleam.toml <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_use_from_gleam_no_toml.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
 Cannot read gleam.toml: No such file or directory
@@ -275,6 +287,10 @@ The checks are built from smaller pure functions, and they're public too. Use th
 | Read a guide badge address, or a diff badge address | `check.parse_guide_link`, `check.parse_compare_link` |
 | Get the anchor of one heading, or of every heading of a document | `check.heading_slug`, `check.heading_anchors` |
 | Tell whether a path is a guide | `check.is_guide_path` |
+| Read the kind of a fence from its info string | `check.classify_fence` |
+| Tell whether a file, command or output block can link to a path | `check.is_tested_file` |
+| Get the requirement that the dependency lines of a release show | `check.release_requirement` |
+| Start a report, or add two reports | `check.empty_report`, `check.add_report` |
 | Read and compare versions, in semver order | `check.parse_release_version`, `check.compare_versions` |
 | Keep a message on one line | `check.one_line` |
 | Read the version of a release notes file, and whether the check reads it | `check.release_notes_version`, `check.is_checked_release_notes` |

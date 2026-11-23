@@ -13,6 +13,8 @@ pub fn problem_line() -> String {
       badge_guide: "CONTRIBUTING.md",
       release_notes_guide: "CONTRIBUTING.md",
       guides: ["docs/guides"],
+      tested_files: ["test", ".github"],
+      dependencies: [],
     )
   // Returns "README.md:14: this code fence has no closing fence"
   check.describe_problem(Problem("README.md", 14, UnclosedFence), project)

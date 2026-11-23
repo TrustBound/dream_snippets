@@ -11,35 +11,28 @@ import fixtures/guide_project
 import gleam/list
 import gleam/result
 
-/// The `[tools.dream_snippets]` table of the defaults, as the page shows
-/// it.
-const defaults_table =
+/// The `[tools.dream_snippets]` table of the defaults, as the page and
+/// the doc comment of `dream_snippets/config` show it.
+fn defaults_table() -> String {
   "
-[tools.dream_snippets]
-markdown = [\"README.md\", \"SECURITY.md\", \"docs\", \"examples\"]
-changelog = [\"CHANGELOG.md\"]
-release_notes = [\"releases\"]
-gleam_source = [\"src\"]
-checked_from_version = \"0.0.0\"
-guides = [\"docs/guides\"]
-badge_guide = \"https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html\"
-release_notes_guide = \"https://hexdocs.pm/dream_snippets/guides/release-notes-template.html\"
-"
+" <> guide_project.read("test/fixtures/settings/defaults.toml")
+}
 
 /// The table of the project with tested docs from 1.1.0 on.
-const two_settings_table =
+fn two_settings_table() -> String {
   "
-[tools.dream_snippets]
-checked_from_version = \"1.1.0\"
-badge_guide = \"docs/contributing.md\"
-"
+" <> guide_project.read("test/fixtures/settings/two_settings.toml")
+}
 
 pub fn tests() -> TestSuite {
   describe("settings and checks reference", [
     it("the defaults table gives the same project as no table", fn() {
       // Act
       let projects =
-        [guide_project.gleam_toml <> defaults_table, guide_project.gleam_toml]
+        [
+          guide_project.gleam_toml() <> defaults_table(),
+          guide_project.gleam_toml(),
+        ]
         |> list.map(fn(text) {
           config.parse(text) |> result.map(fn(parsed) { parsed.project })
         })
@@ -56,7 +49,7 @@ pub fn tests() -> TestSuite {
     it("the defaults table names the default roots", fn() {
       // Act
       let paths =
-        config.parse(guide_project.gleam_toml <> defaults_table)
+        config.parse(guide_project.gleam_toml() <> defaults_table())
         |> result.map(fn(parsed) {
           list.map(parsed.roots, fn(root) { root.path })
         })
@@ -70,7 +63,7 @@ pub fn tests() -> TestSuite {
     it("two settings change the version and the badge guide", fn() {
       // Act
       let settings =
-        config.parse(guide_project.gleam_toml <> two_settings_table)
+        config.parse(guide_project.gleam_toml() <> two_settings_table())
         |> result.map(fn(parsed) {
           #(parsed.checked_from_version, parsed.project.badge_guide)
         })

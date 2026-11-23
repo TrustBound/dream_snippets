@@ -1,7 +1,10 @@
-//// Checks that every code block in the docs of a Gleam project matches a
-//// tested snippet file.
+//// Checks that every code block in the docs of a Gleam project is proven:
+//// each Gleam block matches a tested snippet file, and each other block is
+//// proven in the way that fits its kind (see `dream_snippets/check`).
 ////
 //// Run it from the project root:
+////
+//// ### Run the check <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/scripts/check.sh#L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
 //// ```bash
 //// gleam run -m dream_snippets
@@ -9,7 +12,7 @@
 ////
 //// It prints one line for each problem, as `file:line: reason`, sorted by
 //// file and line, then a summary line, for example
-//// `12 blocks and 0 diff blocks checked in 9 files, 0 problems`. It stops
+//// `12 blocks and 0 diff blocks checked in 9 files, 0 problems; 1 file block, 3 command blocks and 4 output blocks checked; 0 illustration blocks`. It stops
 //// with exit code 1 when it finds a problem or cannot run. It never uses the
 //// network: a badge link is changed to a local path and the file is read
 //// from the working tree. For a `diff` block it runs `git diff` in the
@@ -161,7 +164,7 @@ pub fn check_project(directory: String) -> Result(ProjectReport, CheckError) {
   )
   Ok(ProjectReport(
     project: configuration.project,
-    report: list.fold(reports, empty_report(), add_report),
+    report: list.fold(reports, check.empty_report(), check.add_report),
     file_count: list.length(files),
   ))
 }
@@ -210,13 +213,7 @@ fn report_output(project_report: ProjectReport) -> Output {
   let problems = check.sort_problems(report.problems)
   let problem_lines =
     list.map(problems, fn(problem) { check.describe_problem(problem, project) })
-  let summary =
-    check.summary(
-      report.blocks_checked,
-      report.diff_blocks_checked,
-      file_count,
-      list.length(problems),
-    )
+  let summary = check.summary(report, file_count)
   Output(
     standard_output: list.append(problem_lines, [summary]),
     standard_error: [],
@@ -307,22 +304,10 @@ fn check_release_notes(
   case check.release_notes_version(path) {
     Ok(_version) -> check.check_release_notes(path, text, context)
     Error(Nil) ->
-      Report(blocks_checked: 0, diff_blocks_checked: 0, problems: [
+      Report(..check.empty_report(), problems: [
         check.Problem(file: path, line: 1, reason: check.MisnamedReleaseNotes),
       ])
   }
-}
-
-fn empty_report() -> Report {
-  Report(blocks_checked: 0, diff_blocks_checked: 0, problems: [])
-}
-
-fn add_report(total: Report, report: Report) -> Report {
-  Report(
-    blocks_checked: total.blocks_checked + report.blocks_checked,
-    diff_blocks_checked: total.diff_blocks_checked + report.diff_blocks_checked,
-    problems: list.append(total.problems, report.problems),
-  )
 }
 
 // ---------------------------------------------------------------------------

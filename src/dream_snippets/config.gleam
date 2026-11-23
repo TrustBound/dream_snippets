@@ -4,7 +4,9 @@
 //// tag of its own version, so the check reads `name`, `version` and
 //// `repository` from `gleam.toml`. The places that it reads, and the first
 //// version whose changelog section and release notes it checks, come from
-//// an optional `[tools.dream_snippets]` table:
+//// an optional `[tools.dream_snippets]` table. These are the defaults:
+////
+//// ### The default settings <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/fixtures/settings/defaults.toml"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ////
 //// ```toml
 //// [tools.dream_snippets]
@@ -14,13 +16,17 @@
 //// gleam_source = ["src"]
 //// checked_from_version = "0.0.0"
 //// guides = ["docs/guides"]
+//// tested_files = ["test", ".github"]
 //// badge_guide = "https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html"
 //// release_notes_guide = "https://hexdocs.pm/dream_snippets/guides/release-notes-template.html"
 //// ```
 ////
 //// Each setting is optional. The values above are the defaults. The
 //// default `checked_from_version` checks every changelog section and every
-//// release note. `guides` are the directories that hold the guides of the
+//// release note. `tested_files` are the files and directories that the tests
+//// or CI of the project use: a file, command or output block links to a file
+//// that is one of them or under one of them. `guides` are the directories
+//// that hold the guides of the
 //// project: the guide badge of a README example links to a `.md` file
 //// under one of them. The default `badge_guide` is the "Tested code
 //// blocks" guide of this package on HexDocs, which shows the exact
@@ -72,6 +78,12 @@ pub const default_release_notes_guide =
 /// set. The guide badge of a README example links to a `.md` file under
 /// one of them.
 pub const default_guides = ["docs/guides"]
+
+/// The files and directories that the tests or CI of a project use when
+/// `tested_files` is not set: `test`, where the tests read their files, and
+/// `.github`, where CI reads its workflows and scripts. A file, command or
+/// output block links to a file that is one of them or under one of them.
+pub const default_tested_files = ["test", ".github"]
 
 /// Whether a checked root must exist.
 pub type RootPresence {
@@ -136,6 +148,7 @@ const root_settings = [
 const known_settings = [
   "markdown", "changelog", "release_notes", "gleam_source",
   "checked_from_version", "guides", "badge_guide", "release_notes_guide",
+  "tested_files",
 ]
 
 /// The places that the check reads when `[tools.dream_snippets]` sets none:
@@ -225,7 +238,13 @@ pub fn parse(gleam_toml: String) -> Result(Config, ConfigError) {
   use settings <- result.try(read_settings(document))
   use badge_guide <- result.try(read_badge_guide(settings))
   use release_notes_guide <- result.try(read_release_notes_guide(settings))
-  use guides <- result.try(read_guides(settings))
+  use guides <- result.try(read_path_list(settings, "guides", default_guides))
+  use tested_files <- result.try(read_path_list(
+    settings,
+    "tested_files",
+    default_tested_files,
+  ))
+  use dependencies <- result.try(read_dependency_names(document))
   use checked_from_version <- result.try(read_checked_from_version(settings))
   use roots <- result.try(read_roots(settings))
   Ok(Config(
@@ -236,6 +255,8 @@ pub fn parse(gleam_toml: String) -> Result(Config, ConfigError) {
       badge_guide:,
       release_notes_guide:,
       guides:,
+      tested_files:,
+      dependencies:,
     ),
     roots:,
     checked_from_version:,
@@ -421,18 +442,42 @@ fn read_release_notes_guide(
   option.unwrap(found, default_release_notes_guide)
 }
 
-fn read_guides(
+/// Reads a setting that is a list of paths, such as `guides`, or its
+/// default when it is not set.
+fn read_path_list(
   settings: Dict(String, Toml),
+  setting: String,
+  default: List(String),
 ) -> Result(List(String), ConfigError) {
-  let key = settings_key <> ".guides"
+  let key = settings_key <> "." <> setting
   use found <- result.try(
-    tom.get_array(settings, ["guides"])
+    tom.get_array(settings, [setting])
     |> optional_value(key, "an array of strings"),
   )
   case found {
-    None -> Ok(default_guides)
+    None -> Ok(default)
     Some(items) -> list.try_map(items, fn(item) { string_item(item, key) })
   }
+}
+
+/// The keys of the `[dependencies]` and `[dev-dependencies]` tables, in
+/// that order. A missing table has no keys.
+fn read_dependency_names(
+  document: Dict(String, Toml),
+) -> Result(List(String), ConfigError) {
+  ["dependencies", "dev-dependencies"]
+  |> list.try_map(fn(table) {
+    tom.get_table(document, [table])
+    |> optional_value(table, "a table")
+    |> result.map(fn(found) {
+      found
+      |> option.map(fn(entries) {
+        list.sort(dict.keys(entries), string.compare)
+      })
+      |> option.unwrap([])
+    })
+  })
+  |> result.map(list.flatten)
 }
 
 fn string_item(item: Toml, key: String) -> Result(String, ConfigError) {

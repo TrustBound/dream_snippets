@@ -27,7 +27,7 @@ pub fn tests() -> TestSuite {
       // Arrange
       let assert Ok(directory) =
         project.write_project("guide_use_summary", [
-          #("gleam.toml", guide_project.gleam_toml),
+          #("gleam.toml", guide_project.gleam_toml()),
           #("docs/guides/usage.md", guide),
         ])
 
@@ -35,12 +35,9 @@ pub fn tests() -> TestSuite {
       let lines = doc_check_project.summary_of(directory)
 
       // Assert
-      lines
+      string.concat(list.map(lines, fn(line) { line <> "\n" }))
       |> should
-      |> be_equal([
-        "docs/guides/usage.md:5: this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)",
-        "1 block and 0 diff blocks checked in 1 file, 1 problem",
-      ])
+      |> be_equal(guide_project.output_file("guide_use_from_gleam_summary"))
       |> or_fail_with("summary_of should return the problem and the summary")
     }),
     it("step 2: docs_test passes on the docs of this repository", fn() {
@@ -49,7 +46,7 @@ pub fn tests() -> TestSuite {
 
       // Assert
       lines
-      |> list.map(string.ends_with(_, ", 0 problems"))
+      |> list.map(string.contains(_, ", 0 problems;"))
       |> should
       |> be_equal([True])
       |> or_fail_with("The docs of this repository should have no problem")
@@ -58,7 +55,7 @@ pub fn tests() -> TestSuite {
       // Arrange
       let assert Ok(directory) =
         project.write_project("guide_use_annotations", [
-          #("gleam.toml", guide_project.gleam_toml),
+          #("gleam.toml", guide_project.gleam_toml()),
           #("docs/guides/usage.md", guide),
         ])
 
@@ -66,13 +63,9 @@ pub fn tests() -> TestSuite {
       let lines = guide_use_from_gleam_annotations.annotations(directory)
 
       // Assert
-      lines
+      { string.inspect(lines) <> "\n" }
       |> should
-      |> be_equal(
-        Ok([
-          "::error file=docs/guides/usage.md,line=5::this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)",
-        ]),
-      )
+      |> be_equal(guide_project.output_file("guide_use_from_gleam_annotations"))
       |> or_fail_with("Each problem should be an annotation")
     }),
     it("step 3: annotations returns the error that stops the check", fn() {
@@ -86,19 +79,19 @@ pub fn tests() -> TestSuite {
         |> result_error_message
 
       // Assert
-      result
+      { result <> "\n" }
       |> should
-      |> be_equal("Cannot read gleam.toml: No such file or directory")
+      |> be_equal(guide_project.output_file("guide_use_from_gleam_no_toml"))
       |> or_fail_with("The error should name the missing gleam.toml")
     }),
     it("step 5: context_for finds a tag of the real repository", fn() {
       // Arrange
       let assert Ok(directory) =
         project.write_project("guide_use_context", [
-          #("gleam.toml", guide_project.gleam_toml),
+          #("gleam.toml", guide_project.gleam_toml()),
         ])
       let assert Ok(Nil) = project.commit_and_tag(directory, "0.1.0")
-      let assert Ok(configuration) = config.parse(guide_project.gleam_toml)
+      let assert Ok(configuration) = config.parse(guide_project.gleam_toml())
       let context =
         guide_use_from_gleam_context.context_for(directory, configuration)
 
@@ -129,10 +122,10 @@ pub fn tests() -> TestSuite {
         <> "```\n"
       let assert Ok(directory) =
         project.write_project("guide_use_context_read", [
-          #("gleam.toml", guide_project.gleam_toml),
+          #("gleam.toml", guide_project.gleam_toml()),
           #(snippet_path, guide_project.read(snippet_path)),
         ])
-      let assert Ok(configuration) = config.parse(guide_project.gleam_toml)
+      let assert Ok(configuration) = config.parse(guide_project.gleam_toml())
       let context =
         guide_use_from_gleam_context.context_for(directory, configuration)
 
@@ -144,7 +137,12 @@ pub fn tests() -> TestSuite {
       report
       |> should
       |> be_equal(
-        check.Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        check.Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("The context should read the snippet from the project")
     }),
@@ -153,14 +151,11 @@ pub fn tests() -> TestSuite {
       let output = dream_snippets.output(Error(MissingRoot("docs")))
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(dream_snippets.Output(
-        standard_output: [],
-        standard_error: [
-          "error: docs is set in [tools.dream_snippets] in gleam.toml, but it does not exist",
-        ],
-        exit_status: 1,
+      |> be_equal(#(
+        guide_project.output_file("guide_use_from_gleam_missing_root"),
+        1,
       ))
       |> or_fail_with("A missing root should be an error")
     }),
@@ -170,7 +165,7 @@ pub fn tests() -> TestSuite {
         project.write_project("guide_use_unknown_setting", [
           #(
             "gleam.toml",
-            guide_project.gleam_toml
+            guide_project.gleam_toml()
               <> "\n[tools.dream_snippets]\nguide = [\"docs\"]\n",
           ),
         ])
@@ -180,14 +175,11 @@ pub fn tests() -> TestSuite {
         dream_snippets.output(dream_snippets.check_project(directory))
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(dream_snippets.Output(
-        standard_output: [],
-        standard_error: [
-          "error: tools.dream_snippets.guide in gleam.toml is not a setting; the settings are markdown, changelog, release_notes, gleam_source, checked_from_version, guides, badge_guide, release_notes_guide",
-        ],
-        exit_status: 1,
+      |> be_equal(#(
+        guide_project.output_file("guide_use_from_gleam_unknown_setting"),
+        1,
       ))
       |> or_fail_with("An unknown setting should be an error")
     }),

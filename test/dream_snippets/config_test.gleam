@@ -58,6 +58,8 @@ version = \"9\"
             badge_guide: "https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html",
             release_notes_guide: "https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
             guides: ["docs/guides"],
+            tested_files: ["test", ".github"],
+            dependencies: ["version"],
           ),
           roots: [
             CheckedRoot("README.md", MarkdownDocument, MayBeMissing),
@@ -104,6 +106,8 @@ guides = [\"docs/guides\", \"examples/guides/\"]
             badge_guide: "CONTRIBUTING.md",
             release_notes_guide: "docs/release-notes.md",
             guides: ["docs/guides", "examples/guides/"],
+            tested_files: ["test", ".github"],
+            dependencies: [],
           ),
           roots: [
             CheckedRoot("README.md", MarkdownDocument, MustExist),
@@ -139,6 +143,8 @@ guides = [\"docs/guides\", \"examples/guides/\"]
               badge_guide: "https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html",
               release_notes_guide: "https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
               guides: ["docs/guides"],
+              tested_files: ["test", ".github"],
+              dependencies: [],
             ),
             roots: [
               CheckedRoot("README.md", MarkdownDocument, MustExist),
@@ -448,7 +454,7 @@ fn describe_error_tests() -> UnitNode {
         "gleam.toml names a gitlab repository; the badges link at GitHub, so the repository type must be github",
         "version in gleam.toml must be a string, but its TOML type is Int",
         "tools.dream_snippets.changelog in gleam.toml must be an array of strings",
-        "tools.dream_snippets.roots in gleam.toml is not a setting; the settings are markdown, changelog, release_notes, gleam_source, checked_from_version, guides, badge_guide, release_notes_guide",
+        "tools.dream_snippets.roots in gleam.toml is not a setting; the settings are markdown, changelog, release_notes, gleam_source, checked_from_version, guides, badge_guide, release_notes_guide, tested_files",
         "tools.dream_snippets.checked_from_version in gleam.toml is \"3\", which is not a major.minor.patch version",
       ])
       |> or_fail_with("Each error should have its message")

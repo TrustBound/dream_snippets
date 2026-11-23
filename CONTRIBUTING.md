@@ -21,15 +21,18 @@ dream_snippets is part of the [Dream](https://github.com/TrustBound/dream) famil
 
 ### Development Setup
 
-1. **Fork and clone:**
-   ```bash
+1. **Fork and clone.** Put your GitHub user name in place of `YOUR-USERNAME`:
+   ```bash illustration
    git clone https://github.com/YOUR-USERNAME/dream_snippets.git
    cd dream_snippets
    ```
 
-2. **Run tests:**
+2. **Run tests.** `make test` runs all tests, with line coverage. It's the same line that CI runs:
+
+   #### Run the tests <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/scripts/check.sh#L8"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
    ```bash
-   make test                # All tests, with line coverage
+   gleam test
    ```
 
 3. **Make your changes:**
@@ -37,10 +40,16 @@ dream_snippets is part of the [Dream](https://github.com/TrustBound/dream) famil
    - Add tests for new functionality
    - Update documentation as needed
 
-4. **Format and verify:**
+4. **Format and verify.** `gleam format src test` formats the code. `make check` runs `scripts/check.sh`, the format check, build, tests, docs build and snippet check that CI runs:
+
+   #### What CI runs <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/scripts/check.sh#L6-L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
    ```bash
-   gleam format             # Format code
-   make check               # Format check, build, tests, docs build and snippet check
+   gleam format --check src test
+   gleam build
+   gleam test
+   gleam docs build
+   gleam run -m dream_snippets
    ```
 
 5. **Submit a pull request:**
@@ -90,29 +99,21 @@ Key principles:
 
 ## Development Workflow
 
-1. **Create a branch:**
-   ```bash
-   git checkout -b feature/my-feature
-   # or
-   git checkout -b fix/issue-123
-   ```
+1. **Create a branch**, such as `feature/my-feature` or `fix/issue-123`.
+2. **Make focused commits.**
+3. **Keep your fork updated** from `upstream/main`.
+4. **Push and create a PR.**
 
-2. **Make focused commits:**
-   ```bash
-   git commit -m "Check fences in nested lists"
-   ```
+The names in this block are examples, so it's an illustration:
 
-3. **Keep your fork updated:**
-   ```bash
-   git remote add upstream https://github.com/TrustBound/dream_snippets.git
-   git fetch upstream
-   git rebase upstream/main
-   ```
-
-4. **Push and create PR:**
-   ```bash
-   git push origin feature/my-feature
-   ```
+```bash illustration
+git checkout -b feature/my-feature
+git commit -m "Check fences in nested lists"
+git remote add upstream https://github.com/TrustBound/dream_snippets.git
+git fetch upstream
+git rebase upstream/main
+git push origin feature/my-feature
+```
 
 ## Testing Requirements
 
@@ -130,12 +131,14 @@ Update documentation for:
 - API changes (update all references)
 - Breaking changes (migration guide)
 
-Every Gleam code block in the README and in doc comments comes from a tested snippet in `test/snippets/`. See "Code Blocks in READMEs and Guides" in the [Full Contributing Guide](https://github.com/TrustBound/dream/blob/release/3.0.0/docs/contributing/contributing.md).
+Every Gleam code block in the README and in doc comments comes from a tested snippet in `test/snippets/`. Every other code block is proven too: output in `test/outputs/` that a test compares, commands in `scripts/` that CI runs, and files that the tests or CI use. See "Code Blocks in READMEs and Guides" in the [Full Contributing Guide](https://github.com/TrustBound/dream/blob/release/3.0.0/docs/contributing/contributing.md).
 
-dream_snippets checks its own docs. Run the check from the repository root:
+dream_snippets checks its own docs. Run the check from the repository root with `make check-snippets`. It runs the same command as the last line of the CI script:
+
+### Run the check <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/scripts/check.sh#L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```bash
-make check-snippets      # Same as gleam run -m dream_snippets
+gleam run -m dream_snippets
 ```
 
 ## Review Process

@@ -1,0 +1,5 @@
+README.md:12: the package gleam_jsn is not my_app and not a key of [dependencies] or [dev-dependencies] in gleam.toml; name only packages that this project uses; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+README.md:13: the argument my_app@1 is not a package name; a gleam add line holds package names and --dev, and a gleam deps update line holds package names; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+README.md:14: this gleam add line names no package; name the packages to add; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+README.md:20: this dependency line names gleam_json, but a toml block with no badge names only my_app; link the block to a file that the tests use; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+README.md:21: the requirement of my_app is ">= 0.1.0 and < 1.0.0", but the docs of this release use ">= 0.2.0 and < 1.0.0"; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html

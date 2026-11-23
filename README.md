@@ -26,10 +26,13 @@ Sent here by a "not in the exact format" message? Copy the heading and badges fr
 
 ## Features
 
+- ✅ Proves every fenced code block in Markdown docs and in `///` and `////` doc comments, each in the way that fits its kind, and skips none in silence
 - ✅ Checks each `gleam` block in Markdown docs and in `///` and `////` doc comments
 - ✅ Compares the block with the linked snippet file, or a line range of it, byte for byte
 - ✅ Checks that each README example links to the guide section that shows it
-- ✅ Finds Gleam code hidden in `text`, `bash` or unlabelled fences
+- ✅ Compares each file, command and output block with the file that the tests or CI use, from the `tested_files` setting
+- ✅ Proves `gleam add` lines and `toml` dependency lines with `gleam.toml`, with no file
+- ✅ Counts the blocks marked as an illustration, and finds Gleam code hidden in them
 - ✅ Checks `diff` blocks against the real `git diff` from a release tag
 - ✅ Checks code at an older release against the file at that release tag
 - ✅ Checks the release notes and changelog sections of an older release against the files at its tag, so a version bump needs no change to them
@@ -46,6 +49,8 @@ gleam add --dev dream_snippets
 ## Quick Start
 
 Run the check from the project root:
+
+### Run the check <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/scripts/check.sh#L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/docs/guides/getting-started.md#run-the-check-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 
 ```bash
 gleam run -m dream_snippets

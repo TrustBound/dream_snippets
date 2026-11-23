@@ -1,0 +1,2 @@
+docs/guides/upgrading.md:24: this line is not in "git diff 0.1.0 -- src/my_app.gleam" at this place; a diff block shows lines of the real diff, in order and contiguous within a hunk
+2 blocks and 1 diff block checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks

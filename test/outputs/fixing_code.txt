@@ -1,0 +1,2 @@
+docs/guides/getting-started.md:5: the code block is not the same as test/snippets/guide_getting_started_greeting.gleam; the first difference is at line 9
+docs/guides/getting-started.md:14: the code block is not the same as test/snippets/guide_getting_started_greeting.gleam#L13-L16; the first difference is at line 15

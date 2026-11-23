@@ -16,6 +16,8 @@ pub fn check_my_readme() -> Report {
       badge_guide: "CONTRIBUTING.md",
       release_notes_guide: "CONTRIBUTING.md",
       guides: ["docs/guides"],
+      tested_files: ["test", ".github"],
+      dependencies: [],
     )
   let context =
     CheckContext(
@@ -33,7 +35,7 @@ pub fn check_my_readme() -> Report {
     "### The answer <a href=\"https://github.com/me/my_app/blob/1.2.0/test/snippets/answer.gleam\"><img align=\"right\" alt=\"Tested snippet\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square\"></a>"
   let readme =
     "# My app\n\n" <> heading <> "\n\n```gleam\npub const answer = 42\n```\n"
-  // Returns Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
+  // Returns Report(..empty_report(), blocks_checked: 1, problems: [
   //   Problem(file: "README.md", line: 3, reason: MissingGuideBadge),
   // ])
   check.check_readme("README.md", readme, context)

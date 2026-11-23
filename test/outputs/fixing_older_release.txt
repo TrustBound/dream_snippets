@@ -1,0 +1,8 @@
+releases/release-0.1.0.md:11: the badge link uses the tag 0.2.0, but this file must link at the tag 0.1.0 (release notes and changelog sections link at the tag of their own release)
+releases/release-0.1.0.md:11: the code block is not the same as test/snippets/guide_getting_started_greeting.gleam at the tag 0.1.0; the first difference is at line 15
+releases/release-0.1.0.md:11: this block is in the docs of the release 0.1.0, so it is compared with the files at the tag 0.1.0, but that tag is not in this clone; fetch the tags with "git fetch --tags" (a shallow clone has none)
+releases/release-0.1.0.md:17: the tag 0.1.0 is not a release before 0.1.0, the release of these release notes, so use the tested snippet badge for this code
+releases/release-0.1.0.md:23: the compare link ends at the tag 0.2.0, but this file must use the new tag 0.1.0 (release notes and changelog sections link at the tag of their own release)
+releases/release-0.1.0.md:23: src/my_app.gleam has no changes between the tags 0.0.1 and 0.1.0
+releases/release-0.1.0.md:28: this line is not in "git diff 0.0.1 0.1.0 -- src/my_app.gleam" at this place; a diff block shows lines of the real diff, in order and contiguous within a hunk
+releases/release-0.3.0.md:11: this block is in the docs of the release 0.3.0, which is neither 0.2.0, the version in gleam.toml, nor a release before it; set the version in gleam.toml to the release that these docs are for

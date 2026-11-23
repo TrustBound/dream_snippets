@@ -17,6 +17,8 @@ pub fn check_my_changelog() -> Report {
       badge_guide: "CONTRIBUTING.md",
       release_notes_guide: "CONTRIBUTING.md",
       guides: ["docs/guides"],
+      tested_files: ["test", ".github"],
+      dependencies: [],
     )
   let context =
     CheckContext(
@@ -33,7 +35,7 @@ pub fn check_my_changelog() -> Report {
   let changelog =
     "# Changelog\n\n## [Unreleased]\n\n```gleam\nnew_code()\n```\n\n"
     <> "## [0.9.0] - 2026-01-10\n\n```gleam\nold_code()\n```\n"
-  // Returns Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
+  // Returns Report(..empty_report(), blocks_checked: 1, problems: [
   //   Problem(file: "CHANGELOG.md", line: 5, reason: MissingBadgeHeading),
   // ])
   check.check_changelog("CHANGELOG.md", changelog, context)

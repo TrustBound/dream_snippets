@@ -4,7 +4,7 @@
 //// of it in the example project `my_app` 0.2.0, and assert the exact
 //// output that the guide shows.
 
-import dream_snippets.{type Output, Output}
+import dream_snippets.{type Output}
 import dream_snippets/check.{MissingReleaseNotesSection, Problem}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/suite.{type TestSuite}
@@ -53,15 +53,19 @@ fn replace(line: String, replacement: String) -> String {
   string.replace(complete_notes(), line <> "\n", replacement)
 }
 
-fn mistake(name: String, notes: String, expected: List(String)) {
+/// A test of one mistake: the check of `notes` prints the lines of the
+/// output file `guide_release_notes_template_<name>`, which the guide shows.
+fn mistake(name: String, notes: String) {
   it(name, fn() {
     // Act
-    let output = check_notes(string.replace(name, " ", "_"), notes_path, notes)
+    let output = check_notes(name, notes_path, notes)
 
     // Assert
-    output.standard_output
+    guide_project.printed(output)
     |> should
-    |> be_equal(expected)
+    |> be_equal(guide_project.output_file(
+      "guide_release_notes_template_" <> name,
+    ))
     |> or_fail_with("The check should print the lines of the guide")
   })
 }
@@ -73,11 +77,10 @@ pub fn tests() -> TestSuite {
       let output = check_notes("complete", notes_path, complete_notes())
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        ["0 blocks and 0 diff blocks checked in 2 files, 0 problems"],
-        [],
+      |> be_equal(#(
+        guide_project.output_file("guide_release_notes_template_complete"),
         0,
       ))
       |> or_fail_with("The complete file should follow the template")
@@ -85,22 +88,11 @@ pub fn tests() -> TestSuite {
     mistake(
       "title",
       replace("# my_app 0.2.0 Release Notes", "# my_app 0.1.0 Release Notes\n"),
-      [
-        "releases/release-0.2.0.md:1: the first line is \"# my_app 0.1.0 Release Notes\", but the template wants the title \"# <Name> 0.2.0 Release Notes\"; see \"Release notes template\" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
-        "0 blocks and 0 diff blocks checked in 2 files, 1 problem",
-      ],
     ),
-    mistake("date", replace("**Release Date:** 2026-11-23", ""), [
-      "releases/release-0.2.0.md:1: there is no line that starts with \"**Release Date:**\" between the title and the first section, but the template wants one there; see \"Release notes template\" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
-      "0 blocks and 0 diff blocks checked in 2 files, 1 problem",
-    ]),
+    mistake("date", replace("**Release Date:** 2026-11-23", "")),
     mistake(
       "unknown",
       replace("## Testing", "## Files changed\n\n## Testing\n"),
-      [
-        "releases/release-0.2.0.md:17: \"## Files changed\" is not a section of the release notes template; see \"Release notes template\" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
-        "0 blocks and 0 diff blocks checked in 2 files, 1 problem",
-      ],
     ),
     mistake(
       "order",
@@ -109,39 +101,18 @@ pub fn tests() -> TestSuite {
           "## Documentation\n",
           "## Testing\n\n## Documentation\n",
         ),
-      [
-        "releases/release-0.2.0.md:26: \"## Testing\" comes after \"## Upgrading\", but the template has it before \"## Upgrading\"; see \"Release notes template\" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
-        "0 blocks and 0 diff blocks checked in 2 files, 1 problem",
-      ],
     ),
-    mistake("repeated", replace("## Testing", "## What's New\n\n## Testing\n"), [
-      "releases/release-0.2.0.md:17: \"## What's New\" is in the file again (first at line 11), but the template has each section one time at most; see \"Release notes template\" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
-      "0 blocks and 0 diff blocks checked in 2 files, 1 problem",
-    ]),
+    mistake("repeated", replace("## Testing", "## What's New\n\n## Testing\n")),
     mistake(
       "both",
       replace("## Documentation", "## Installing\n\n## Documentation\n"),
-      [
-        "releases/release-0.2.0.md:27: \"## Upgrading\" and \"## Installing\" are both in the file, but the template allows only one of them; see \"Release notes template\" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
-        "0 blocks and 0 diff blocks checked in 2 files, 1 problem",
-      ],
     ),
-    mistake("missing", replace("## Testing", ""), [
-      "releases/release-0.2.0.md:1: the section \"## Testing\" is missing, but the template requires it; see \"Release notes template\" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
-      "0 blocks and 0 diff blocks checked in 2 files, 1 problem",
-    ]),
+    mistake("missing", replace("## Testing", "")),
     mistake(
       "neither",
       replace("## Upgrading", "") |> string.replace("### Migration Guide\n", ""),
-      [
-        "releases/release-0.2.0.md:1: neither \"## Upgrading\" nor \"## Installing\" is in the file, but the template requires one of them; see \"Release notes template\" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
-        "0 blocks and 0 diff blocks checked in 2 files, 1 problem",
-      ],
     ),
-    mistake("migration", replace("### Migration Guide", ""), [
-      "releases/release-0.2.0.md:21: \"## Upgrading\" has no \"### Migration Guide\", but the template requires it in that section; see \"Release notes template\" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
-      "0 blocks and 0 diff blocks checked in 2 files, 1 problem",
-    ]),
+    mistake("migration", replace("### Migration Guide", "")),
     it("step 1: old release notes pass after a version bump", fn() {
       // Act
       let output = check_old_notes("release_notes_old", "0.1.0")
@@ -149,7 +120,9 @@ pub fn tests() -> TestSuite {
       // Assert
       output.standard_output
       |> should
-      |> be_equal(["1 block and 0 diff blocks checked in 2 files, 0 problems"])
+      |> be_equal([
+        "1 block and 0 diff blocks checked in 2 files, 0 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
+      ])
       |> or_fail_with("Old notes should be checked at their own tag")
     }),
     it("pitfall: old release notes whose tag is not in the clone", fn() {
@@ -161,7 +134,7 @@ pub fn tests() -> TestSuite {
       |> should
       |> be_equal([
         "releases/release-0.1.0.md:11: this block is in the docs of the release 0.1.0, so it is compared with the files at the tag 0.1.0, but that tag is not in this clone; fetch the tags with \"git fetch --tags\" (a shallow clone has none)",
-        "1 block and 0 diff blocks checked in 2 files, 1 problem",
+        "1 block and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
       ])
       |> or_fail_with("The notes of 0.1.0 need the tag 0.1.0")
     }),

@@ -13,6 +13,8 @@ The check failed, in CI or on your machine, and you need to know what it wants. 
 - [The line range](#the-line-range)
 - [The code](#the-code)
 - [Other fences](#other-fences)
+- [Blocks of other languages](#blocks-of-other-languages)
+- [Packages and dependency lines](#packages-and-dependency-lines)
 - [README examples and the guide badge](#readme-examples-and-the-guide-badge)
 - [Diff blocks](#diff-blocks)
 - [Code at an older release](#code-at-an-older-release)
@@ -37,20 +39,24 @@ The examples use the project of the other guides, `my_app`, here at version `0.2
 
 Run the check from the project root:
 
+### Run the check <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/scripts/check.sh#L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```sh
 gleam run -m dream_snippets
 ```
 
 ## Step 1: Find the place
 
-The check prints one line for each problem, sorted by file and line, and a summary at the end. It stops with exit status 1 when there's at least one problem:
+The check prints one line for each problem, sorted by file and line, and a summary at the end. It stops with exit status 1 when there's at least one problem. Here it is for a guide whose snippet changed:
+
+### A failed check <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_getting_started_step_5_changed.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
 docs/guides/getting-started.md:5: the code block is not the same as test/snippets/guide_getting_started_greeting.gleam; the first difference is at line 9
-1 block and 0 diff blocks checked in 3 files, 1 problem
+1 block and 0 diff blocks checked in 3 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
-The part before the second colon is the place: the file, then the line, counted from 1. For a code block, a badge above it, a diff block, or code at an older release, the line is the opening fence of the block. For a guide badge, it's the heading. For a line of a diff block, a hidden Gleam line or an old `🧪 Tested source` line, it's that line. For release notes, it's the line of the section heading, or line 1 when something is missing.
+The part before the second colon is the place: the file, then the line, counted from 1. For a code block, a badge above it, a diff block, or code at an older release, the line is the opening fence of the block. For a guide badge, it's the heading. For a line of a diff block, a hidden Gleam line, an old `🧪 Tested source` line, a `gleam add` line or a dependency line, it's that line. For release notes, it's the line of the section heading, or line 1 when something is missing.
 
 Each message is exactly one line. A control character in a file name or a value, such as a line break, shows as `\n`, `\r`, `\t` or `\u{<hex>}`.
 
@@ -64,7 +70,9 @@ The rest is the reason. Match its first words with the sections below:
 | `the badge link`, `the badge links to`, `cannot read` | [The badge link](#the-badge-link) |
 | `the line anchor`, `the line range` | [The line range](#the-line-range) |
 | `the code block is not the same as` | [The code](#the-code) |
-| `this line looks like Gleam code`, `this code fence has no closing fence` | [Other fences](#other-fences) |
+| `this line looks like Gleam code`, `this code fence has no language`, `this code fence has no closing fence` | [Other fences](#other-fences) |
+| `this <language> code block has no heading` for a language that is not `gleam` or `diff`, `the badge links to ... which is not under a tested_files path` | [Blocks of other languages](#blocks-of-other-languages) |
+| `the package`, `the argument`, `this gleam add line`, `this dependency line`, `the requirement of` | [Packages and dependency lines](#packages-and-dependency-lines) |
 | `this README example heading`, `the guide badge`, `this heading has a guide badge`, `... has no tested snippet badge that links to` | [README examples and the guide badge](#readme-examples-and-the-guide-badge) |
 | `this diff block`, `the tested diff badge`, `the diff badge link`, `the compare link`, `the diff block`, `the hunk header`, `this line is not in "git diff`, `cannot run git`, `... has no changes since the tag` | [Diff blocks](#diff-blocks) |
 | `the code at an older release badge`, `this heading has the code at an older release badge`, `the tag ... is not`, `which is not a file at the tag` | [Code at an older release](#code-at-an-older-release) |
@@ -73,6 +81,8 @@ The rest is the reason. Match its first words with the sections below:
 | `error:` | [Errors that stop the check](#errors-that-stop-the-check) |
 
 ## The heading and the badge
+
+### The heading and badge messages <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/fixing_heading_and_badge.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
 docs/guides/getting-started.md:5: this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)
@@ -85,6 +95,8 @@ docs/guides/getting-started.md:3: the old "🧪 Tested source" line is not used 
 - **`the old "🧪 Tested source" line`.** An earlier form of tested docs put a `🧪 Tested source` link on its own line next to the block. *Fix:* delete that line and put the tested snippet badge at the end of the heading.
 
 ## The badge link
+
+### The badge link messages <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/fixing_badge_link.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
 docs/guides/getting-started.md:5: the badge link https://github.com/someone/my_app/blob/0.2.0/test/snippets/guide_getting_started_greeting.gleam does not point at a file in https://github.com/me/my_app
@@ -100,6 +112,8 @@ docs/guides/getting-started.md:5: cannot read test/snippets/guide_getting_starte
 
 ## The line range
 
+### The line range messages <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/fixing_line_range.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 docs/guides/getting-started.md:5: the line anchor #L5:L9 is not #L<n> or #L<start>-L<end>
 docs/guides/getting-started.md:5: the line range starts at line 9, after its end at line 5
@@ -112,6 +126,8 @@ docs/guides/getting-started.md:5: the line range ends at line 20, but the file h
 
 ## The code
 
+### The code messages <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/fixing_code.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 docs/guides/getting-started.md:5: the code block is not the same as test/snippets/guide_getting_started_greeting.gleam; the first difference is at line 9
 docs/guides/getting-started.md:14: the code block is not the same as test/snippets/guide_getting_started_greeting.gleam#L13-L16; the first difference is at line 15
@@ -123,16 +139,61 @@ This is the message you'll see most. The block and the file (or the line range o
 
 ## Other fences
 
+### The fence messages <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/fixing_fences.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
-docs/guides/usage.md:4: this line looks like Gleam code in a text code fence; put Gleam code in a gleam block with the tested snippet badge
-docs/guides/usage.md:9: this line looks like Gleam code in a code fence with no language; put Gleam code in a gleam block with the tested snippet badge
+docs/guides/usage.md:4: this line looks like Gleam code in a text illustration code fence; put Gleam code in a gleam block with the tested snippet badge
+docs/guides/usage.md:8: this code fence has no language; name the language of the block and prove it, or mark it as an illustration with "```text illustration"; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
 docs/guides/usage.md:12: this code fence has no closing fence
 ```
 
-- **`this line looks like Gleam code`.** A fence with another language, or with none, holds a line such as `import a/b`, `pub fn name(`, `use x <- ...`, `let assert ...` or `|> list.map(`. The check can't prove code it doesn't treat as Gleam, so it doesn't allow it. *Fix:* move the code to a `gleam` block with a badge. If the line really isn't Gleam, rewrite it so it doesn't take one of these forms. [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md#step-5-keep-gleam-code-out-of-other-fences) has the full list.
+- **`this line looks like Gleam code`.** An illustration, or an example document in a `markdown` fence, holds a line such as `import a/b`, `pub fn name(`, `use x <- ...`, `let assert ...` or `|> list.map(`. Nothing proves an illustration, so it must not hold Gleam code. *Fix:* move the code to a `gleam` block with a badge. If the line really isn't Gleam, rewrite it so it doesn't take one of these forms. [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md#step-9-keep-gleam-code-out-of-illustrations) has the full list.
+- **`this code fence has no language`.** A fence with no language can't be proven, so it's always a problem. *Fix:* name the language of the block, then prove the block as its kind needs. If nothing can prove it, such as a folder tree, mark it as an illustration: ```` ```text illustration ````.
 - **`this code fence has no closing fence`.** A fence opens on that line and the document ends before it closes, so everything after it would be code. *Fix:* close the fence with the same character, at least as many of them as it opened with.
 
+## Blocks of other languages
+
+Every code block needs a proof. A block of any language other than `gleam`, `diff` and `markdown` is a copy of a file that the tests or CI use, with the same badge as a Gleam snippet:
+
+### The messages of blocks of other languages <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/fixing_other_blocks.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```text
+docs/guides/deploy.md:5: this dockerfile code block has no heading with the tested snippet badge directly above it; link it to the file that it copies, or mark it as an illustration with "```dockerfile illustration"; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+docs/guides/deploy.md:12: this sh code block has no heading with the tested snippet badge directly above it; link it to the script that it copies, show only "gleam add" and "gleam deps update" lines, or mark it as an illustration with "```sh illustration"; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+docs/guides/deploy.md:18: this text code block has no heading with the tested snippet badge directly above it; link it to the output file that a test compares with the real output, or mark it as an illustration with "```text illustration"; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+docs/guides/deploy.md:25: the badge links to docs/deploy/Dockerfile, which is not under a tested_files path (test, .github); link to a file that the tests or CI use, and add its path to tested_files in [tools.dream_snippets] in gleam.toml; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+```
+
+- **`this dockerfile code block has no heading`.** A file block: any language that isn't a command or `text`, such as `yaml`, `toml`, `sql` or `dockerfile`. *Fix:* add a heading with the tested snippet badge that links to the file the block copies, such as the Dockerfile that CI builds, with a line range if the block shows only part of it. For a `toml` block of `[dependencies]` lines, see [Packages and dependency lines](#packages-and-dependency-lines).
+- **`this sh code block has no heading`.** A command block: `bash`, `sh`, `shell` or `console`. *Fix:* put the command in a script that CI or a test runs, and link the block to its line. A block of only `gleam add` and `gleam deps update` lines needs no badge.
+- **`this text code block has no heading`.** An output block. *Fix:* put the output in a file, such as `test/outputs/<name>.txt`, have a test compare it with the real output, and link the block to it.
+- **`which is not under a tested_files path`.** The check can't see whether a test or CI uses a file, so the project lists the files and directories that they use in the `tested_files` setting. *Fix:* link to a file that the tests or CI use. When the file is one of them, add its path, or its directory, to `tested_files` in `[tools.dream_snippets]`.
+
+In all four, a block that nothing can prove, such as a folder tree or a placeholder form, can be marked as an illustration instead: write `illustration` after the language, as in ```` ```text illustration ````. The summary line counts illustrations, so a reviewer sees how many there are. [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md#which-proof-to-use) shows each form.
+
+## Packages and dependency lines
+
+Two kinds of blocks are proven with no file. A command block of only `gleam add` and `gleam deps update` lines names packages that `gleam.toml` names. A `toml` block of only `[dependencies]` or `[dev-dependencies]` lines names the package of the project, with the requirement of the release of the document:
+
+### The package and dependency messages <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/fixing_packages.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```text
+README.md:12: the package gleam_jsn is not my_app and not a key of [dependencies] or [dev-dependencies] in gleam.toml; name only packages that this project uses; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+README.md:13: the argument my_app@1 is not a package name; a gleam add line holds package names and --dev, and a gleam deps update line holds package names; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+README.md:14: this gleam add line names no package; name the packages to add; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+README.md:20: this dependency line names gleam_json, but a toml block with no badge names only my_app; link the block to a file that the tests use; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+README.md:21: the requirement of my_app is ">= 0.1.0 and < 1.0.0", but the docs of this release use ">= 0.2.0 and < 1.0.0"; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+```
+
+- **`the package gleam_jsn is not my_app and not a key of [dependencies] or [dev-dependencies]`.** A typo, or a package that your project doesn't use. *Fix:* fix the name. If the docs tell the reader to add a package, your project uses it too, so it's in `gleam.toml`.
+- **`the argument my_app@1 is not a package name`.** The check proves only package names, and `--dev` on a `gleam add` line. *Fix:* leave out the version. `gleam add` picks the latest release, and the requirement belongs in a `toml` block.
+- **`this gleam add line names no package`.** *Fix:* name the packages.
+- **`this dependency line names gleam_json`.** A `toml` block with no badge shows only the package of the project, as the upgrade and install blocks of release notes do. *Fix:* for other packages, link the block to a file that the tests use.
+- **`the requirement of my_app is ">= 0.1.0 and < 1.0.0"`.** The block is in the docs of `0.2.0`, so the requirement is the one that `gleam add` writes for `0.2.0`. Release notes and a changelog section use their own release. *Fix:* write the requirement that the message names.
+
 ## README examples and the guide badge
+
+### The guide badge messages <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/fixing_guide_badge.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
 README.md:5: this README example heading has no guide badge after its tested snippet badge; copy the heading from https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
@@ -159,6 +220,8 @@ docs/guides/getting-started.md:3: this heading has a guide badge, but only READM
 - **`this heading has a guide badge, but only README example headings have one`.** A guide, release notes or a doc comment has a heading copied from the README. *Fix:* remove the guide badge from that heading.
 
 ## Diff blocks
+
+### The diff block messages <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/fixing_diff_blocks.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
 docs/guides/upgrading.md:19: this diff block has no heading with the tested diff badge directly above it (one blank line between is allowed)
@@ -189,6 +252,8 @@ docs/guides/upgrading.md:24: this line is not in "git diff 0.1.0 -- src/my_app.g
 
 ## Code at an older release
 
+### The code at an older release messages <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/fixing_old_code.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 docs/guides/upgrading.md:7: the code at an older release badge is not in the exact format, or the tag in its alt text or image is not the tag of its link; copy it from https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
 docs/guides/upgrading.md:7: this heading has the code at an older release badge and another badge, but a heading with that badge has no other badge
@@ -211,6 +276,8 @@ README.md:5: the code at an older release badge is only allowed in the guides un
 
 ## Release notes
 
+### The release notes name message <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/fixing_release_notes_name.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 releases/notes-0.2.0.md:1: a release notes file must be named "release-<version>.md", for example "release-1.2.0.md"; see "Release notes template" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html
 ```
@@ -220,6 +287,8 @@ This one comes when a `release_notes` setting names a single file with another n
 ## Docs of an older release
 
 Release notes and a `## [<version>]` changelog section belong to their own release. When that release is older than the version in `gleam.toml`, their blocks are compared with the files at its tag, and their diffs end at its tag. These messages are about them. Here `gleam.toml` says `0.2.0`, and the notes are those of `0.1.0`:
+
+### The messages of the docs of an older release <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/fixing_older_release.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
 releases/release-0.1.0.md:11: the badge link uses the tag 0.2.0, but this file must link at the tag 0.1.0 (release notes and changelog sections link at the tag of their own release)
@@ -243,6 +312,8 @@ releases/release-0.3.0.md:11: this block is in the docs of the release 0.3.0, wh
 
 These come before any file is checked, on standard error, with exit status 1 and no summary:
 
+### The errors that stop the check <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/fixing_errors.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 error: gleam.toml is not valid TOML: found m where value was expected
 error: gleam.toml sets the key name twice
@@ -252,7 +323,7 @@ error: gleam.toml has no repository = { type = "github", user = "...", repo = ".
 error: gleam.toml names a gitlab repository; the badges link at GitHub, so the repository type must be github
 error: tools.dream_snippets.markdown in gleam.toml must be an array of strings, but its TOML type is String
 error: tools.dream_snippets.markdown in gleam.toml must be an array of strings
-error: tools.dream_snippets.guide in gleam.toml is not a setting; the settings are markdown, changelog, release_notes, gleam_source, checked_from_version, guides, badge_guide, release_notes_guide
+error: tools.dream_snippets.guide in gleam.toml is not a setting; the settings are markdown, changelog, release_notes, gleam_source, checked_from_version, guides, badge_guide, release_notes_guide, tested_files
 error: tools.dream_snippets.checked_from_version in gleam.toml is "1.0", which is not a major.minor.patch version
 error: examples is set in [tools.dream_snippets] in gleam.toml, but it does not exist
 error: Cannot read gleam.toml: No such file or directory

@@ -13,6 +13,8 @@ pub fn wrong_tag_reason() -> String {
       badge_guide: "CONTRIBUTING.md",
       release_notes_guide: "CONTRIBUTING.md",
       guides: ["docs/guides"],
+      tested_files: ["test", ".github"],
+      dependencies: [],
     )
   // Returns "the badge link uses the tag 1.1.0, but this file must link at the
   // tag 1.2.0 (the docs of my_app use the version in gleam.toml)"

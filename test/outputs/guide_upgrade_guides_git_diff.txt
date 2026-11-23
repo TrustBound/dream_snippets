@@ -1,0 +1,18 @@
+diff --git a/src/my_app.gleam b/src/my_app.gleam
+index 3a8f4d4..d72828d 100644
+--- a/src/my_app.gleam
++++ b/src/my_app.gleam
+@@ -1,3 +1,11 @@
+-pub fn greeting(name: String) -> String {
+-  "Hello, " <> name <> "!"
++pub fn greeting(name: String, style: Style) -> String {
++  case style {
++    Casual -> "Hi, " <> name <> "!"
++    Formal -> "Hello, " <> name <> "."
++  }
++}
++
++pub type Style {
++  Casual
++  Formal
+ }

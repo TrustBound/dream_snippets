@@ -1,5 +1,15 @@
 //// The checks: each code block in a document is backed by tested code.
 ////
+//// Every fenced code block has a kind, which `classify_fence` reads from
+//// its info string, and each kind has its own proof (see `BlockKind`):
+//// `gleam` and `diff` blocks as below; file, command and output blocks as
+//// copies of files that the tests or CI use, with the same badge as a
+//// Gleam snippet; `gleam add`, `gleam deps update` and `toml` dependency
+//// lines with no file, from `gleam.toml` and the release of the document;
+//// and illustrations, which nothing proves, but which are counted and hold
+//// no Gleam code. A fence with no language is a problem. No block is
+//// skipped in silence.
+////
 //// Each ```` ```gleam ```` block in a Markdown doc, and each one in a `///`
 //// or `////` doc comment in `src/`, has a heading directly above it that
 //// ends with the "tested snippet" badge. The badge links to a file in the
@@ -10,10 +20,10 @@
 //// The tests of the project compile and run the file, so the code in the
 //// docs is code that works.
 ////
-//// A fence with another language (or no language) must not hold Gleam
-//// code, because then the check would not see it. A line in such a fence
-//// is Gleam code when it is one of these forms, which no other common
-//// language of the docs has (see `looks_like_gleam`):
+//// An illustration must not hold Gleam code, because then the check would
+//// not prove it. A line in an illustration is Gleam code when it is one of
+//// these forms, which no other common language of the docs has (see
+//// `looks_like_gleam`):
 ////
 //// - `import a/b` (a module path with a `/`) or `import a.{...}`
 //// - `fn name(` or `pub fn name(`
@@ -160,7 +170,12 @@ pub type CodeSource {
 /// that a release notes template message tells the reader to read.
 /// `guides` are the directories that hold the guides of the project, such
 /// as `docs/guides`: the guide badge of a README example must link to a
-/// `.md` file under one of them.
+/// `.md` file under one of them. `tested_files` are the files and
+/// directories that the tests or CI of the project use, such as `test` and
+/// `.github`: a file, command or output block must link to a file that is
+/// one of them or under one of them. `dependencies` are the keys of the
+/// `[dependencies]` and `[dev-dependencies]` tables of `gleam.toml`: a
+/// `gleam add` or `gleam deps update` block names only them and `name`.
 pub type Project {
   Project(
     name: String,
@@ -169,6 +184,8 @@ pub type Project {
     badge_guide: String,
     release_notes_guide: String,
     guides: List(String),
+    tested_files: List(String),
+    dependencies: List(String),
   )
 }
 
@@ -211,6 +228,10 @@ const guide_badge_end =
   <> "\" src=\""
   <> guide_badge_image
   <> "\"></a>"
+
+/// The text that shows that a heading has a tested snippet badge, in any
+/// form.
+const snippet_badge_marker = " alt=\"Tested snippet\""
 
 /// The text that shows that a heading has a guide badge, in any form.
 const guide_badge_marker = " alt=\"" <> guide_badge_alt <> "\""
@@ -436,6 +457,38 @@ pub type Reason {
   /// Release notes or a changelog section belong to `release`, which is not
   /// `version`, the version in `gleam.toml`, and not a release before it.
   ReleaseNotBeforeVersion(release: String, version: String)
+  /// A file block (see `FileBlock`) has no heading with the tested snippet
+  /// badge directly above it, and it is not a block of dependency lines.
+  MissingFileBadgeHeading(language: String)
+  /// A command block (see `CommandBlock`) has no heading with the tested
+  /// snippet badge directly above it, and it is not a block of only
+  /// `gleam add` and `gleam deps update` lines.
+  MissingCommandBadgeHeading(language: String)
+  /// An output block (see `OutputBlock`) has no heading with the tested
+  /// snippet badge directly above it.
+  MissingOutputBadgeHeading
+  /// A code fence has no language, so nothing can prove its block.
+  UnlabelledFence
+  /// The badge of a file, command or output block links to `path`, which
+  /// is not one of the `tested_files` paths of the project and not under
+  /// one of them.
+  UntestedFile(path: String, tested_files: List(String))
+  /// A `gleam add` or `gleam deps update` line names `package`, which is
+  /// not the package of the project and not a key of `[dependencies]` or
+  /// `[dev-dependencies]` in `gleam.toml`.
+  UnknownPackage(package: String)
+  /// A `gleam add` or `gleam deps update` line has `argument`, which is
+  /// not a package name, and not `--dev` on a `gleam add` line.
+  UnsupportedPackageArgument(argument: String)
+  /// A `gleam add` line names no package.
+  GleamAddWithoutPackage
+  /// A block of dependency lines names `package`, which is not the
+  /// package of the project.
+  ForeignDependency(package: String)
+  /// The requirement of the package of the project in a block of
+  /// dependency lines is `found`, but the release of the document wants
+  /// `expected`.
+  WrongDependencyRequirement(package: String, found: String, expected: String)
 }
 
 /// One problem: the file, the 1-based line, and why.
@@ -446,9 +499,53 @@ pub type Problem {
 /// The result of checking one or more documents.
 ///
 /// `blocks_checked` counts the Gleam code blocks that were checked, and
-/// `diff_blocks_checked` the diff blocks.
+/// `diff_blocks_checked` the diff blocks. `file_blocks_checked`,
+/// `command_blocks_checked` and `output_blocks_checked` count the blocks of
+/// those kinds (see `BlockKind`), and `illustration_blocks` the blocks
+/// marked as an illustration, which nothing proves.
 pub type Report {
-  Report(blocks_checked: Int, diff_blocks_checked: Int, problems: List(Problem))
+  Report(
+    blocks_checked: Int,
+    diff_blocks_checked: Int,
+    file_blocks_checked: Int,
+    command_blocks_checked: Int,
+    output_blocks_checked: Int,
+    illustration_blocks: Int,
+    problems: List(Problem),
+  )
+}
+
+/// The kind of a fenced code block, read from its info string by
+/// `classify_fence`. Each kind has its own proof, and no kind is skipped.
+pub type BlockKind {
+  /// A `gleam` block: a copy of a tested snippet file, or of code at an
+  /// older release.
+  GleamBlock
+  /// A `diff` block: a part of the real `git diff` of one file.
+  DiffBlock
+  /// A `markdown` or `md` block: an example document. Its fences are
+  /// checked like the fences of any other document, and its other lines
+  /// must not look like Gleam code.
+  ExampleDocumentBlock
+  /// A `bash`, `sh`, `shell` or `console` block: a copy of a script that
+  /// CI or a test runs, or only `gleam add` and `gleam deps update` lines
+  /// that name packages of `gleam.toml`.
+  CommandBlock(language: String)
+  /// A `text` block: a copy of an output file that a test compares with
+  /// the real output.
+  OutputBlock
+  /// A block whose info string is a language and then the word
+  /// `illustration`, such as `text illustration`: a diagram, a tree or a
+  /// placeholder form that nothing proves. It is counted, and it must not
+  /// hold Gleam code. A `gleam`, `diff`, `markdown` or `md` block is never
+  /// an illustration.
+  IllustrationBlock(language: String)
+  /// A block with any other language, such as `yaml`, `toml` or `sql`: a
+  /// copy of a file that the tests or CI use, or for `toml` only
+  /// dependency lines of the package of the project.
+  FileBlock(language: String)
+  /// A block with no language. Nothing can prove it, so it is a problem.
+  UnlabelledBlock
 }
 
 /// A link to GitHub's compare view of one file, read from a diff badge.
@@ -524,9 +621,10 @@ pub type LineSelection {
   LineRange(start: Int, end: Int)
 }
 
-/// The opening line of a fenced code block.
+/// The opening line of a fenced code block, with the kind that
+/// `classify_fence` reads from its info string.
 type FenceOpener {
-  FenceOpener(indent: Int, marker: String, length: Int, language: String)
+  FenceOpener(indent: Int, marker: String, length: Int, kind: BlockKind)
 }
 
 /// A fenced code block. `content` has the fence indent removed.
@@ -909,6 +1007,8 @@ fn is_checked_version(version: Version, checked_from_version: Version) -> Bool {
 ///       badge_guide: "CONTRIBUTING.md",
 ///       release_notes_guide: "CONTRIBUTING.md",
 ///       guides: ["docs/guides"],
+///       tested_files: ["test", ".github"],
+///       dependencies: [],
 ///     )
 ///   let context =
 ///     CheckContext(
@@ -925,7 +1025,7 @@ fn is_checked_version(version: Version, checked_from_version: Version) -> Bool {
 ///   let changelog =
 ///     "# Changelog\n\n## [Unreleased]\n\n```gleam\nnew_code()\n```\n\n"
 ///     <> "## [0.9.0] - 2026-01-10\n\n```gleam\nold_code()\n```\n"
-///   // Returns Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
+///   // Returns Report(..empty_report(), blocks_checked: 1, problems: [
 ///   //   Problem(file: "CHANGELOG.md", line: 5, reason: MissingBadgeHeading),
 ///   // ])
 ///   check.check_changelog("CHANGELOG.md", changelog, context)
@@ -1514,9 +1614,12 @@ fn compare_problems(first: Problem, second: Problem) -> Order {
   )
 }
 
-/// The last line of the output, for example
-/// `412 blocks and 5 diff blocks checked in 230 files, 0 problems`. A count
-/// of 1 takes the singular, as in `1 block`.
+/// The last line of the output, for a report of the blocks of `files`
+/// files, for example
+/// `412 blocks and 5 diff blocks checked in 230 files, 0 problems; 3 file blocks, 40 command blocks and 52 output blocks checked; 2 illustration blocks`.
+/// The part before the `;` is the line of earlier versions. `blocks`
+/// counts the `gleam` blocks. A count of 1 takes the singular, as in
+/// `1 block`.
 ///
 /// ## Examples
 ///
@@ -1526,23 +1629,35 @@ fn compare_problems(first: Problem, second: Problem) -> Order {
 /// import dream_snippets/check
 ///
 /// pub fn summary_line() -> String {
-///   // Returns "12 blocks and 2 diff blocks checked in 9 files, 1 problem"
-///   check.summary(12, 2, 9, 1)
+///   let report =
+///     check.Report(
+///       ..check.empty_report(),
+///       blocks_checked: 12,
+///       diff_blocks_checked: 2,
+///       command_blocks_checked: 1,
+///       output_blocks_checked: 4,
+///       problems: [check.Problem("README.md", 3, check.UnlabelledFence)],
+///     )
+///   // Returns "12 blocks and 2 diff blocks checked in 9 files, 1 problem; 0 file blocks, 1 command block and 4 output blocks checked; 0 illustration blocks"
+///   check.summary(report, 9)
 /// }
 /// ```
-pub fn summary(
-  blocks: Int,
-  diff_blocks: Int,
-  files: Int,
-  problems: Int,
-) -> String {
-  counted(blocks, "block")
+pub fn summary(report: Report, files: Int) -> String {
+  counted(report.blocks_checked, "block")
   <> " and "
-  <> counted(diff_blocks, "diff block")
+  <> counted(report.diff_blocks_checked, "diff block")
   <> " checked in "
   <> counted(files, "file")
   <> ", "
-  <> counted(problems, "problem")
+  <> counted(list.length(report.problems), "problem")
+  <> "; "
+  <> counted(report.file_blocks_checked, "file block")
+  <> ", "
+  <> counted(report.command_blocks_checked, "command block")
+  <> " and "
+  <> counted(report.output_blocks_checked, "output block")
+  <> " checked; "
+  <> counted(report.illustration_blocks, "illustration block")
 }
 
 /// A number and a noun, in the singular for 1 and in the plural (with an
@@ -1575,6 +1690,8 @@ fn counted(number: Int, noun: String) -> String {
 ///       badge_guide: "CONTRIBUTING.md",
 ///       release_notes_guide: "CONTRIBUTING.md",
 ///       guides: ["docs/guides"],
+///       tested_files: ["test", ".github"],
+///       dependencies: [],
 ///     )
 ///   // Returns "README.md:14: this code fence has no closing fence"
 ///   check.describe_problem(Problem("README.md", 14, UnclosedFence), project)
@@ -1706,6 +1823,8 @@ pub fn repository_url(repository: GitHubRepository) -> String {
 ///       badge_guide: "CONTRIBUTING.md",
 ///       release_notes_guide: "CONTRIBUTING.md",
 ///       guides: ["docs/guides"],
+///       tested_files: ["test", ".github"],
+///       dependencies: [],
 ///     )
 ///   // Returns "the badge link uses the tag 1.1.0, but this file must link at the
 ///   // tag 1.2.0 (the docs of my_app use the version in gleam.toml)"
@@ -1951,6 +2070,77 @@ fn reason_text(reason: Reason, project: Project) -> String {
       <> ", which is neither "
       <> version
       <> ", the version in gleam.toml, nor a release before it; set the version in gleam.toml to the release that these docs are for"
+    MissingFileBadgeHeading(language:) ->
+      "this "
+      <> language
+      <> " code block has no heading with the tested snippet badge directly above it; link it to the file that it copies, or mark it as an illustration with \"```"
+      <> language
+      <> " illustration\""
+      <> badge_pointer(project)
+    MissingCommandBadgeHeading(language:) ->
+      "this "
+      <> language
+      <> " code block has no heading with the tested snippet badge directly above it; link it to the script that it copies, show only \"gleam add\" and \"gleam deps update\" lines, or mark it as an illustration with \"```"
+      <> language
+      <> " illustration\""
+      <> badge_pointer(project)
+    MissingOutputBadgeHeading ->
+      "this text code block has no heading with the tested snippet badge directly above it; link it to the output file that a test compares with the real output, or mark it as an illustration with \"```text illustration\""
+      <> badge_pointer(project)
+    UnlabelledFence ->
+      "this code fence has no language; name the language of the block and prove it, or mark it as an illustration with \"```text illustration\""
+      <> badge_pointer(project)
+    UntestedFile(path:, tested_files:) ->
+      "the badge links to "
+      <> path
+      <> ", which is not under a tested_files path ("
+      <> describe_paths(tested_files)
+      <> "); link to a file that the tests or CI use, and add its path to tested_files in [tools.dream_snippets] in gleam.toml"
+      <> badge_pointer(project)
+    UnknownPackage(package:) ->
+      "the package "
+      <> package
+      <> " is not "
+      <> project.name
+      <> " and not a key of [dependencies] or [dev-dependencies] in gleam.toml; name only packages that this project uses"
+      <> badge_pointer(project)
+    UnsupportedPackageArgument(argument:) ->
+      "the argument "
+      <> argument
+      <> " is not a package name; a gleam add line holds package names and --dev, and a gleam deps update line holds package names"
+      <> badge_pointer(project)
+    GleamAddWithoutPackage ->
+      "this gleam add line names no package; name the packages to add"
+      <> badge_pointer(project)
+    ForeignDependency(package:) ->
+      "this dependency line names "
+      <> package
+      <> ", but a toml block with no badge names only "
+      <> project.name
+      <> "; link the block to a file that the tests use"
+      <> badge_pointer(project)
+    WrongDependencyRequirement(package:, found:, expected:) ->
+      "the requirement of "
+      <> package
+      <> " is \""
+      <> found
+      <> "\", but the docs of this release use \""
+      <> expected
+      <> "\""
+      <> badge_pointer(project)
+  }
+}
+
+/// The end of each message about the proof of a block that is not a
+/// `gleam` or `diff` block: where the forms of each kind are written.
+fn badge_pointer(project: Project) -> String {
+  "; see " <> project.badge_guide
+}
+
+fn describe_paths(paths: List(String)) -> String {
+  case paths {
+    [] -> "none is set"
+    _ -> string.join(paths, ", ")
   }
 }
 
@@ -1975,16 +2165,41 @@ fn merge_reports(reports: List(Report)) -> Report {
   list.fold(reports, empty_report(), add_report)
 }
 
-fn add_report(total: Report, report: Report) -> Report {
+/// Adds the counts and the problems of two reports. The problems of
+/// `report` come after those of `total`.
+///
+/// ## Examples
+///
+/// ### Add two reports <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_add_report.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{type Report}
+///
+/// pub fn two_reports() -> Report {
+///   let first = check.Report(..check.empty_report(), blocks_checked: 2)
+///   let second = check.Report(..check.empty_report(), output_blocks_checked: 1)
+///   // Returns Report(blocks_checked: 2, diff_blocks_checked: 0,
+///   //   file_blocks_checked: 0, command_blocks_checked: 0,
+///   //   output_blocks_checked: 1, illustration_blocks: 0, problems: [])
+///   check.add_report(first, second)
+/// }
+/// ```
+pub fn add_report(total: Report, report: Report) -> Report {
   Report(
     blocks_checked: total.blocks_checked + report.blocks_checked,
     diff_blocks_checked: total.diff_blocks_checked + report.diff_blocks_checked,
+    file_blocks_checked: total.file_blocks_checked + report.file_blocks_checked,
+    command_blocks_checked: total.command_blocks_checked
+      + report.command_blocks_checked,
+    output_blocks_checked: total.output_blocks_checked
+      + report.output_blocks_checked,
+    illustration_blocks: total.illustration_blocks + report.illustration_blocks,
     problems: list.append(total.problems, report.problems),
   )
 }
 
 fn problems_report(problems: List(Problem)) -> Report {
-  Report(blocks_checked: 0, diff_blocks_checked: 0, problems:)
+  Report(..empty_report(), problems:)
 }
 
 // ---------------------------------------------------------------------------
@@ -2027,6 +2242,8 @@ fn problems_report(problems: List(Problem)) -> Report {
 ///       badge_guide: "CONTRIBUTING.md",
 ///       release_notes_guide: "CONTRIBUTING.md",
 ///       guides: ["docs/guides"],
+///       tested_files: ["test", ".github"],
+///       dependencies: [],
 ///     )
 ///   let context =
 ///     CheckContext(
@@ -2108,6 +2325,8 @@ pub fn check_markdown(
 ///       badge_guide: "CONTRIBUTING.md",
 ///       release_notes_guide: "CONTRIBUTING.md",
 ///       guides: ["docs/guides"],
+///       tested_files: ["test", ".github"],
+///       dependencies: [],
 ///     )
 ///   let context =
 ///     CheckContext(
@@ -2125,7 +2344,7 @@ pub fn check_markdown(
 ///     "### The answer <a href=\"https://github.com/me/my_app/blob/1.2.0/test/snippets/answer.gleam\"><img align=\"right\" alt=\"Tested snippet\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square\"></a>"
 ///   let readme =
 ///     "# My app\n\n" <> heading <> "\n\n```gleam\npub const answer = 42\n```\n"
-///   // Returns Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
+///   // Returns Report(..empty_report(), blocks_checked: 1, problems: [
 ///   //   Problem(file: "README.md", line: 3, reason: MissingGuideBadge),
 ///   // ])
 ///   check.check_readme("README.md", readme, context)
@@ -2185,6 +2404,8 @@ pub fn check_readme(
 ///       badge_guide: "CONTRIBUTING.md",
 ///       release_notes_guide: "CONTRIBUTING.md",
 ///       guides: ["docs/guides"],
+///       tested_files: ["test", ".github"],
+///       dependencies: [],
 ///     )
 ///   let context =
 ///     CheckContext(
@@ -2203,7 +2424,7 @@ pub fn check_readme(
 ///     <> heading
 ///     <> "\n\n```gleam\npub const answer = 41\n```\n"
 ///   // The old code block passes. The notes have no sections, so it returns
-///   // Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
+///   // Report(..empty_report(), blocks_checked: 1, problems: [
 ///   //   Problem(file, 1, MissingReleaseNotesSection("Key Highlights")),
 ///   //   Problem(file, 1, MissingReleaseNotesSection("What's New")),
 ///   //   Problem(file, 1, MissingReleaseNotesSection("Testing")),
@@ -2275,6 +2496,8 @@ pub fn check_release_notes(
 ///       badge_guide: "CONTRIBUTING.md",
 ///       release_notes_guide: "CONTRIBUTING.md",
 ///       guides: ["docs/guides"],
+///       tested_files: ["test", ".github"],
+///       dependencies: [],
 ///     )
 ///   let context =
 ///     CheckContext(
@@ -2298,7 +2521,7 @@ pub fn check_release_notes(
 ///   Nil
 /// }
 /// "
-///   // Returns Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
+///   // Returns Report(..empty_report(), blocks_checked: 1, problems: [
 ///   //   Problem(file: "src/app.gleam", line: 3, reason: MissingBadgeHeading),
 ///   // ])
 ///   check.check_gleam_source("src/app.gleam", source, context)
@@ -2325,8 +2548,30 @@ pub fn check_gleam_source(
   |> merge_reports
 }
 
-fn empty_report() -> Report {
-  problems_report([])
+/// A report with no block and no problem: each count is 0.
+///
+/// ## Examples
+///
+/// ### Start with an empty report <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_empty_report.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check
+///
+/// pub fn no_problems() -> Int {
+///   // Returns 0
+///   check.empty_report().blocks_checked
+/// }
+/// ```
+pub fn empty_report() -> Report {
+  Report(
+    blocks_checked: 0,
+    diff_blocks_checked: 0,
+    file_blocks_checked: 0,
+    command_blocks_checked: 0,
+    output_blocks_checked: 0,
+    illustration_blocks: 0,
+    problems: [],
+  )
 }
 
 fn numbered_lines(text: String, first_number: Int) -> List(Line) {
@@ -2481,19 +2726,63 @@ fn fence_opener(
   case marker == "`" && string.contains(info, "`") {
     True -> None
     False ->
-      Some(FenceOpener(
-        indent:,
-        marker:,
-        length:,
-        language: string.lowercase(first_word(info)),
-      ))
+      Some(FenceOpener(indent:, marker:, length:, kind: classify_fence(info)))
   }
 }
 
-fn first_word(text: String) -> String {
-  case string.split_once(text, " ") {
-    Ok(#(word, _)) -> word
-    Error(Nil) -> text
+/// The word after the language in the info string of a fence that marks
+/// its block as an illustration, as in ```` ```text illustration ````.
+pub const illustration_mark = "illustration"
+
+/// Reads the kind of a fenced code block from its info string, the text
+/// after the opening backticks or tildes. Every check of a block gets its
+/// kind from here, so each block has exactly one kind, and a language that
+/// the check does not know is a file block that needs a proof.
+///
+/// The language is the first word, in lowercase. `gleam`, `diff`,
+/// `markdown` and `md` always give their own kind. Any other language with
+/// exactly one more word, `illustration`, gives an illustration. Then
+/// `bash`, `sh`, `shell` and `console` give a command block, `text` an
+/// output block, and every other language a file block. An empty info
+/// string gives an unlabelled block.
+///
+/// ## Examples
+///
+/// ### Read the kind of each fence <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_classify_fence.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{type BlockKind}
+/// import gleam/list
+///
+/// pub fn fence_kinds() -> List(BlockKind) {
+///   // Returns [GleamBlock, CommandBlock("sh"), OutputBlock,
+///   //   IllustrationBlock("text"), FileBlock("yaml"), UnlabelledBlock]
+///   list.map(
+///     ["gleam", "sh", "text", "text illustration", "yaml", ""],
+///     check.classify_fence,
+///   )
+/// }
+/// ```
+pub fn classify_fence(info: String) -> BlockKind {
+  let words =
+    info
+    |> string.split(" ")
+    |> list.filter(fn(word) { word != "" })
+  case words {
+    [] -> UnlabelledBlock
+    [language, ..rest] -> classify_language(string.lowercase(language), rest)
+  }
+}
+
+fn classify_language(language: String, rest: List(String)) -> BlockKind {
+  case language, rest {
+    "gleam", _ -> GleamBlock
+    "diff", _ -> DiffBlock
+    "markdown", _ | "md", _ -> ExampleDocumentBlock
+    _, [mark] if mark == illustration_mark -> IllustrationBlock(language)
+    "bash", _ | "sh", _ | "shell", _ | "console", _ -> CommandBlock(language)
+    "text", _ -> OutputBlock
+    _, _ -> FileBlock(language)
   }
 }
 
@@ -2558,20 +2847,24 @@ fn check_block(
     True -> []
     False -> [Problem(file:, line: block.opening_line, reason: UnclosedFence)]
   }
-  let report = case block.opener.language {
-    "gleam" ->
+  let linked = fn(kind) {
+    check_linked_block(block, kind, above, after, rules, file, context)
+  }
+  let report = case block.opener.kind {
+    GleamBlock ->
+      Report(..problems_report(linked(GleamBlock)), blocks_checked: 1)
+    DiffBlock ->
       Report(
-        blocks_checked: 1,
-        diff_blocks_checked: 0,
-        problems: check_gleam_block(block, above, after, rules, file, context),
-      )
-    "diff" ->
-      Report(
-        blocks_checked: 0,
+        ..problems_report(check_diff_block(
+          block,
+          above,
+          rules.release,
+          file,
+          context,
+        )),
         diff_blocks_checked: 1,
-        problems: check_diff_block(block, above, rules.release, file, context),
       )
-    "markdown" | "md" ->
+    ExampleDocumentBlock ->
       scan(
         block.content,
         [],
@@ -2581,9 +2874,104 @@ fn check_block(
         context,
         empty_report(),
       )
-    language -> problems_report(hidden_gleam(block, language, file))
+    FileBlock(language:) ->
+      Report(
+        ..problems_report(
+          proven_without_badge(
+            block,
+            FileBlock(language),
+            above,
+            file,
+            linked,
+            fn() {
+              dependency_problems(
+                block,
+                language,
+                rules.release,
+                file,
+                context.project,
+              )
+            },
+          ),
+        ),
+        file_blocks_checked: 1,
+      )
+    CommandBlock(language:) ->
+      Report(
+        ..problems_report(
+          proven_without_badge(
+            block,
+            CommandBlock(language),
+            above,
+            file,
+            linked,
+            fn() { package_command_problems(block, file, context.project) },
+          ),
+        ),
+        command_blocks_checked: 1,
+      )
+    OutputBlock ->
+      Report(..problems_report(linked(OutputBlock)), output_blocks_checked: 1)
+    IllustrationBlock(language:) ->
+      Report(
+        ..problems_report(hidden_gleam(
+          block,
+          language <> " " <> illustration_mark,
+          file,
+        )),
+        illustration_blocks: 1,
+      )
+    UnlabelledBlock ->
+      problems_report([
+        Problem(file:, line: block.opening_line, reason: UnlabelledFence),
+      ])
   }
   add_report(problems_report(unclosed), report)
+}
+
+/// The problems of a file or command block. A block under a heading with
+/// a badge is checked against the file of the badge. A block with no such
+/// heading is checked by `shape_problems` when its lines have the shape
+/// that the kind can prove with no file: dependency lines for `toml`, and
+/// `gleam add` or `gleam deps update` lines for a command.
+fn proven_without_badge(
+  block: FencedBlock,
+  kind: BlockKind,
+  above: List(Line),
+  file: String,
+  linked: fn(BlockKind) -> List(Problem),
+  shape_problems: fn() -> Result(List(Problem), Nil),
+) -> List(Problem) {
+  case has_badge_heading(above) {
+    True -> linked(kind)
+    False ->
+      shape_problems()
+      |> result.lazy_unwrap(fn() {
+        [Problem(file:, line: block.opening_line, reason: missing_proof(kind))]
+      })
+  }
+}
+
+/// Tells whether the heading above a block, with at most one blank line
+/// between, has a tested snippet badge or a code at an older release
+/// badge, in any form.
+fn has_badge_heading(above: List(Line)) -> Bool {
+  case first_line_skipping_one_blank(above) {
+    Some(line) ->
+      string.contains(line.text, snippet_badge_marker)
+      || string.contains(line.text, old_code_badge_marker)
+    None -> False
+  }
+}
+
+/// The reason of a block of `kind` that has no heading with a badge.
+fn missing_proof(kind: BlockKind) -> Reason {
+  case kind {
+    FileBlock(language:) -> MissingFileBadgeHeading(language)
+    CommandBlock(language:) -> MissingCommandBadgeHeading(language)
+    OutputBlock -> MissingOutputBadgeHeading
+    _ -> MissingBadgeHeading
+  }
 }
 
 fn hidden_gleam(
@@ -2599,8 +2987,13 @@ fn hidden_gleam(
   }
 }
 
-fn check_gleam_block(
+/// The problems of a block that is a copy of a file: a `gleam` block, or
+/// a file, command or output block with a badge. The heading rules are the
+/// same for each kind. A block of another kind than `gleam` must also link
+/// to a file of `tested_files`, and its missing heading has its own reason.
+fn check_linked_block(
   block: FencedBlock,
+  kind: BlockKind,
   above: List(Line),
   after: List(Line),
   rules: DocumentRules,
@@ -2610,13 +3003,55 @@ fn check_gleam_block(
   let at_block = fn(reason) {
     Problem(file:, line: block.opening_line, reason:)
   }
-  let old_line_below =
-    old_tested_source_line(first_line_skipping_one_blank(after), file)
+  let old_line_below = case kind {
+    GleamBlock ->
+      old_tested_source_line(first_line_skipping_one_blank(after), file)
+    _ -> []
+  }
   let heading_problems = case first_line_skipping_one_blank(above) {
-    None -> [at_block(MissingBadgeHeading)]
-    Some(line) -> check_heading(line, block, rules, file, context)
+    None -> [at_block(missing_proof(kind))]
+    Some(line) -> check_heading(line, block, kind, rules, file, context)
   }
   list.append(heading_problems, old_line_below)
+}
+
+/// The problem of a link of a block of `kind` to `path`: a block of
+/// another kind than `gleam` links only to a file of `tested_files`.
+fn tested_file_reasons(
+  kind: BlockKind,
+  path: String,
+  project: Project,
+) -> List(Reason) {
+  case kind, is_tested_file(path, project.tested_files) {
+    GleamBlock, _ | _, True -> []
+    _, False -> [UntestedFile(path:, tested_files: project.tested_files)]
+  }
+}
+
+/// Tells whether a path is one of the `tested_files` paths, or a file
+/// under one of them. A trailing `/` of a path in the list is ignored.
+///
+/// ## Examples
+///
+/// ### Find the files that a file block can link to <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_is_tested_file.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check
+/// import gleam/list
+///
+/// pub fn tested_paths() -> List(Bool) {
+///   // Returns [True, True, False]
+///   list.map(
+///     [".github/workflows/ci.yml", "Makefile", "docs/example.yml"],
+///     check.is_tested_file(_, ["test", ".github/", "Makefile"]),
+///   )
+/// }
+/// ```
+pub fn is_tested_file(path: String, tested_files: List(String)) -> Bool {
+  list.any(tested_files, fn(tested) {
+    let tested = remove_trailing_slashes(tested)
+    path == tested || string.starts_with(path, tested <> "/")
+  })
 }
 
 /// The nearest line, or the line after one blank line. A second blank
@@ -2656,6 +3091,7 @@ fn old_tested_source_line(line: Option(Line), file: String) -> List(Problem) {
 fn check_heading(
   heading: Line,
   block: FencedBlock,
+  kind: BlockKind,
   rules: DocumentRules,
   file: String,
   context: CheckContext,
@@ -2666,12 +3102,12 @@ fn check_heading(
       Problem(file:, line: heading.number, reason: OldTestedSourceLine),
     ]
     False, True ->
-      old_code_reasons(heading, block, rules, context)
+      old_code_reasons(heading, block, kind, rules, context)
       |> list.map(fn(reason) {
         Problem(file:, line: block.opening_line, reason:)
       })
     False, False ->
-      example_heading_problems(heading, block, rules, file, context)
+      example_heading_problems(heading, block, kind, rules, file, context)
   }
 }
 
@@ -2681,6 +3117,7 @@ fn check_heading(
 fn example_heading_problems(
   heading: Line,
   block: FencedBlock,
+  kind: BlockKind,
   rules: DocumentRules,
   file: String,
   context: CheckContext,
@@ -2693,11 +3130,17 @@ fn example_heading_problems(
       |> result.map(fn(link) { #(example, link) })
     })
   case parsed {
+    Error(MissingBadgeHeading) -> [
+      at_line(block.opening_line)(missing_proof(kind)),
+    ]
     Error(reason) -> [at_line(block.opening_line)(reason)]
     Ok(#(example, link)) ->
       list.append(
         list.map(
-          check_link(link, block, rules.release, context),
+          list.append(
+            tested_file_reasons(kind, link.path, context.project),
+            check_link(link, block, rules.release, context),
+          ),
           at_line(block.opening_line),
         ),
         list.map(
@@ -3412,6 +3855,232 @@ fn shows_snippet(
 }
 
 // ---------------------------------------------------------------------------
+// Blocks proven with no file
+// ---------------------------------------------------------------------------
+
+/// One `gleam add` or `gleam deps update` line, with the words after the
+/// command.
+type PackageCommand {
+  GleamAdd(line: Line, arguments: List(String))
+  DepsUpdate(line: Line, arguments: List(String))
+}
+
+/// The problems of a command block with no badge whose lines are each a
+/// `gleam add` or a `gleam deps update` line (blank lines are allowed), or
+/// `Error(Nil)` when the block has another line, or no such line.
+///
+/// Each argument is a package name or, on a `gleam add` line, `--dev`.
+/// Each package name is the name of the project or a key of
+/// `[dependencies]` or `[dev-dependencies]` in `gleam.toml`, so the reader
+/// adds a package that exists and that this project uses. A `gleam add`
+/// line names at least one package.
+fn package_command_problems(
+  block: FencedBlock,
+  file: String,
+  project: Project,
+) -> Result(List(Problem), Nil) {
+  use commands <- result.map(package_commands(block.content))
+  commands
+  |> list.flat_map(fn(command) { package_command_reasons(command, project) })
+  |> list.map(fn(found) {
+    let #(line, reason) = found
+    Problem(file:, line: line.number, reason:)
+  })
+}
+
+fn package_commands(lines: List(Line)) -> Result(List(PackageCommand), Nil) {
+  let commands =
+    lines
+    |> list.filter(fn(line) { !is_blank(line.text) })
+    |> list.try_map(package_command)
+  case commands {
+    Ok([]) -> Error(Nil)
+    _ -> commands
+  }
+}
+
+fn package_command(line: Line) -> Result(PackageCommand, Nil) {
+  case words(line.text) {
+    ["gleam", "add", ..arguments] -> Ok(GleamAdd(line:, arguments:))
+    ["gleam", "deps", "update", ..arguments] ->
+      Ok(DepsUpdate(line:, arguments:))
+    _ -> Error(Nil)
+  }
+}
+
+fn words(text: String) -> List(String) {
+  text
+  |> string.split(" ")
+  |> list.filter(fn(word) { word != "" })
+}
+
+fn package_command_reasons(
+  command: PackageCommand,
+  project: Project,
+) -> List(#(Line, Reason)) {
+  let #(line, arguments, flags) = case command {
+    GleamAdd(line:, arguments:) -> #(line, arguments, ["--dev"])
+    DepsUpdate(line:, arguments:) -> #(line, arguments, [])
+  }
+  let packages =
+    list.filter(arguments, fn(argument) { !list.contains(flags, argument) })
+  let empty_add = case command, packages {
+    GleamAdd(..), [] -> [GleamAddWithoutPackage]
+    _, _ -> []
+  }
+  packages
+  |> list.filter_map(fn(package) { package_reason(package, project) })
+  |> list.append(empty_add)
+  |> list.map(fn(reason) { #(line, reason) })
+}
+
+fn package_reason(package: String, project: Project) -> Result(Reason, Nil) {
+  let known =
+    package == project.name || list.contains(project.dependencies, package)
+  case is_package_name(package), known {
+    False, _ -> Ok(UnsupportedPackageArgument(package))
+    True, False -> Ok(UnknownPackage(package))
+    True, True -> Error(Nil)
+  }
+}
+
+/// Tells whether a text is a Gleam package name: a lowercase letter, then
+/// lowercase letters, digits and `_`.
+fn is_package_name(text: String) -> Bool {
+  starts_with_lowercase(text) && is_made_of(text, name_characters)
+}
+
+/// One line of a block of dependency lines.
+type DependencyLine {
+  DependencyTable(line: Line)
+  Dependency(line: Line, package: String, requirement: String)
+}
+
+/// The problems of a `toml` block with no badge whose lines are dependency
+/// lines, or `Error(Nil)` when the block is not a `toml` block or has
+/// another line.
+///
+/// The first line that is not blank is `[dependencies]` or
+/// `[dev-dependencies]`. Each other line is blank, one of those two table
+/// lines, or `<package> = "<requirement>"`, and the block has at least one
+/// requirement. Each package is the package of the project, and its
+/// requirement is `>= <release> and < <next major>.0.0`, where `<release>`
+/// is the release of the document (see `document_release`). So the notes
+/// of `2.0.0` show `>= 2.0.0 and < 3.0.0`, as `gleam add` writes it for
+/// that release.
+fn dependency_problems(
+  block: FencedBlock,
+  language: String,
+  release: DocumentRelease,
+  file: String,
+  project: Project,
+) -> Result(List(Problem), Nil) {
+  use lines <- result.map(case language {
+    "toml" -> dependency_lines(block.content)
+    _ -> Error(Nil)
+  })
+  lines
+  |> list.filter_map(fn(line) { dependency_reason(line, release.tag, project) })
+  |> list.map(fn(found) {
+    let #(line, reason) = found
+    Problem(file:, line: line.number, reason:)
+  })
+}
+
+fn dependency_lines(lines: List(Line)) -> Result(List(DependencyLine), Nil) {
+  use parsed <- result.try(
+    lines
+    |> list.filter(fn(line) { !is_blank(line.text) })
+    |> list.try_map(dependency_line),
+  )
+  let has_requirement =
+    list.any(parsed, fn(line) {
+      case line {
+        Dependency(..) -> True
+        DependencyTable(..) -> False
+      }
+    })
+  case parsed, has_requirement {
+    [DependencyTable(..), ..], True -> Ok(parsed)
+    _, _ -> Error(Nil)
+  }
+}
+
+fn dependency_line(line: Line) -> Result(DependencyLine, Nil) {
+  case string.trim(line.text) {
+    "[dependencies]" | "[dev-dependencies]" -> Ok(DependencyTable(line))
+    text -> {
+      use #(package, value) <- result.try(string.split_once(text, " = "))
+      use requirement <- result.try(quoted_text(value))
+      case is_package_name(package) {
+        True -> Ok(Dependency(line:, package:, requirement:))
+        False -> Error(Nil)
+      }
+    }
+  }
+}
+
+fn quoted_text(value: String) -> Result(String, Nil) {
+  use after_quote <- result.try(remove_prefix(value, "\""))
+  use text <- result.try(remove_suffix(after_quote, "\""))
+  case string.contains(text, "\"") {
+    True -> Error(Nil)
+    False -> Ok(text)
+  }
+}
+
+fn dependency_reason(
+  line: DependencyLine,
+  release: String,
+  project: Project,
+) -> Result(#(Line, Reason), Nil) {
+  case line {
+    DependencyTable(..) -> Error(Nil)
+    Dependency(line:, package:, requirement:) ->
+      requirement_reason(package, requirement, release, project)
+      |> result.map(fn(reason) { #(line, reason) })
+  }
+}
+
+fn requirement_reason(
+  package: String,
+  requirement: String,
+  release: String,
+  project: Project,
+) -> Result(Reason, Nil) {
+  let expected = release_requirement(release)
+  case package == project.name, requirement == expected {
+    False, _ -> Ok(ForeignDependency(package))
+    True, False ->
+      Ok(WrongDependencyRequirement(package:, found: requirement, expected:))
+    True, True -> Error(Nil)
+  }
+}
+
+/// The requirement that `gleam add` writes for a release:
+/// `>= <release> and < <next major>.0.0`.
+///
+/// ## Examples
+///
+/// ### Write the requirement of a release <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_release_requirement.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check
+///
+/// pub fn requirement() -> String {
+///   // Returns ">= 2.1.0-rc.1 and < 3.0.0"
+///   check.release_requirement("2.1.0-rc.1")
+/// }
+/// ```
+pub fn release_requirement(release: String) -> String {
+  let next_major = case parse_release_version(release) {
+    Ok(version) -> int.to_string(version.major + 1)
+    Error(Nil) -> "<next major>"
+  }
+  ">= " <> release <> " and < " <> next_major <> ".0.0"
+}
+
+// ---------------------------------------------------------------------------
 // Code at an older release
 // ---------------------------------------------------------------------------
 
@@ -3516,15 +4185,22 @@ fn old_code_link(
 fn old_code_reasons(
   heading: Line,
   block: FencedBlock,
+  kind: BlockKind,
   rules: DocumentRules,
   context: CheckContext,
 ) -> List(Reason) {
-  case rules.old_code {
-    OldCodeForbidden -> [OldCodeNotAllowed(context.project.guides)]
-    OldCodeAllowed ->
-      parse_old_code_heading(heading.text, context.project.repository)
-      |> result.try(check_old_code(_, block, rules.release, context))
-      |> result_to_reasons
+  case
+    rules.old_code,
+    parse_old_code_heading(heading.text, context.project.repository)
+  {
+    OldCodeForbidden, _ -> [OldCodeNotAllowed(context.project.guides)]
+    OldCodeAllowed, Error(reason) -> [reason]
+    OldCodeAllowed, Ok(link) ->
+      list.append(
+        tested_file_reasons(kind, link.path, context.project),
+        check_old_code(link, block, rules.release, context)
+          |> result_to_reasons,
+      )
   }
 }
 

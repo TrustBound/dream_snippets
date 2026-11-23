@@ -1,0 +1,8 @@
+docs/guides/upgrading.md:7: the code at an older release badge is not in the exact format, or the tag in its alt text or image is not the tag of its link; copy it from https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+docs/guides/upgrading.md:7: this heading has the code at an older release badge and another badge, but a heading with that badge has no other badge
+docs/guides/upgrading.md:7: the tag v0.1.0~1 or the path test/snippets/guide_upgrading_greet_lucy.gleam has characters that the check does not give to git (a tag has only letters, digits and . _ -, and a path also /)
+docs/guides/upgrading.md:7: the tag 0.2.0 is not a release before 0.2.0, the version in gleam.toml, so use the tested snippet badge for this code
+docs/guides/upgrading.md:7: the tag 0.1.0 is not in this clone; fetch the tags with "git fetch --tags" (a shallow clone has none)
+docs/guides/upgrading.md:7: the badge links to test/snippets/guide_upgrading_greet_lucy.gleam, which is not a file at the tag 0.1.0
+docs/guides/upgrading.md:7: the code block is not the same as test/snippets/guide_upgrading_greet_lucy.gleam#L4 at the tag 0.1.0; the first difference is at line 8
+README.md:5: the code at an older release badge is only allowed in the guides under docs/guides and in release notes, because the README, the changelog and doc comments show only code of the current version

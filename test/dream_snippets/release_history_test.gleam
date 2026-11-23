@@ -264,7 +264,7 @@ fn release_notes_tests() -> UnitNode {
       output
       |> should
       |> be_equal(passed(
-        "3 blocks and 2 diff blocks checked in 3 files, 0 problems",
+        "3 blocks and 2 diff blocks checked in 3 files, 0 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
       ))
       |> or_fail_with("Old release notes should be checked at their own tag")
     }),
@@ -286,7 +286,7 @@ fn release_notes_tests() -> UnitNode {
       |> be_equal(
         failed([
           "releases/release-0.2.0.md:11: the code block is not the same as test/snippets/greet_lucy.gleam#L4 at the tag 0.2.0; the first difference is at line 12",
-          "1 block and 0 diff blocks checked in 2 files, 1 problem",
+          "1 block and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
         ]),
       )
       |> or_fail_with("The block should be compared with the file at 0.2.0")
@@ -311,7 +311,7 @@ fn release_notes_tests() -> UnitNode {
       |> be_equal(
         failed([
           "releases/release-0.2.0.md:11: the badge link uses the tag 0.3.0, but this file must link at the tag 0.2.0 (release notes and changelog sections link at the tag of their own release)",
-          "1 block and 0 diff blocks checked in 2 files, 1 problem",
+          "1 block and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
         ]),
       )
       |> or_fail_with("Old release notes link at their own release")
@@ -336,7 +336,7 @@ fn release_notes_tests() -> UnitNode {
       |> be_equal(
         failed([
           "releases/release-0.2.0.md:11: the compare link ends at the tag 0.3.0, but this file must use the new tag 0.2.0 (release notes and changelog sections link at the tag of their own release)",
-          "0 blocks and 1 diff block checked in 2 files, 1 problem",
+          "0 blocks and 1 diff block checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
         ]),
       )
       |> or_fail_with("An old diff ends at the release of its notes")
@@ -365,7 +365,7 @@ fn release_notes_tests() -> UnitNode {
       |> be_equal(
         failed([
           "releases/release-0.2.0.md:16: this line is not in \"git diff 0.1.0 0.2.0 -- src/my_app.gleam\" at this place; a diff block shows lines of the real diff, in order and contiguous within a hunk",
-          "0 blocks and 1 diff block checked in 2 files, 1 problem",
+          "0 blocks and 1 diff block checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
         ]),
       )
       |> or_fail_with("An old diff is the diff between the two tags")
@@ -384,7 +384,7 @@ fn release_notes_tests() -> UnitNode {
         failed([
           "releases/release-0.2.0.md:11: this block is in the docs of the release 0.2.0, so it is compared with the files at the tag 0.2.0, but that tag is not in this clone; fetch the tags with \"git fetch --tags\" (a shallow clone has none)",
           "releases/release-0.2.0.md:23: this block is in the docs of the release 0.2.0, so it is compared with the files at the tag 0.2.0, but that tag is not in this clone; fetch the tags with \"git fetch --tags\" (a shallow clone has none)",
-          "2 blocks and 1 diff block checked in 2 files, 2 problems",
+          "2 blocks and 1 diff block checked in 2 files, 2 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
         ]),
       )
       |> or_fail_with("A missing release tag should fail the snippet and diff")
@@ -407,7 +407,7 @@ fn release_notes_tests() -> UnitNode {
       |> be_equal(
         failed([
           "releases/release-0.4.0.md:11: this block is in the docs of the release 0.4.0, which is neither 0.3.0, the version in gleam.toml, nor a release before it; set the version in gleam.toml to the release that these docs are for",
-          "1 block and 0 diff blocks checked in 2 files, 1 problem",
+          "1 block and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
         ]),
       )
       |> or_fail_with("Docs of a later release cannot be checked")
@@ -446,7 +446,7 @@ fn changelog_tests() -> UnitNode {
       output
       |> should
       |> be_equal(passed(
-        "2 blocks and 2 diff blocks checked in 2 files, 0 problems",
+        "2 blocks and 2 diff blocks checked in 2 files, 0 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
       ))
       |> or_fail_with("An old section should be checked at its own tag")
     }),
@@ -466,7 +466,7 @@ fn changelog_tests() -> UnitNode {
       |> be_equal(
         failed([
           "CHANGELOG.md:24: the code block is not the same as test/snippets/greet_lucy.gleam#L4 at the tag 0.2.0; the first difference is at line 25",
-          "2 blocks and 1 diff block checked in 2 files, 1 problem",
+          "2 blocks and 1 diff block checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
         ]),
       )
       |> or_fail_with("The old section should be compared with the tag")
@@ -487,7 +487,7 @@ fn changelog_tests() -> UnitNode {
       |> be_equal(
         failed([
           "CHANGELOG.md:7: the code block is not the same as test/snippets/greet_lucy.gleam#L4; the first difference is at line 8",
-          "1 block and 0 diff blocks checked in 2 files, 1 problem",
+          "1 block and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
         ]),
       )
       |> or_fail_with("Unreleased should be compared with the working tree")
@@ -516,7 +516,7 @@ fn pre_release_tests() -> UnitNode {
       output
       |> should
       |> be_equal(passed(
-        "1 block and 0 diff blocks checked in 2 files, 0 problems",
+        "1 block and 0 diff blocks checked in 2 files, 0 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
       ))
       |> or_fail_with("0.3.0-rc.1 is a release before 0.3.0")
     }),
@@ -538,7 +538,7 @@ fn pre_release_tests() -> UnitNode {
       output
       |> should
       |> be_equal(passed(
-        "1 block and 0 diff blocks checked in 2 files, 0 problems",
+        "1 block and 0 diff blocks checked in 2 files, 0 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
       ))
       |> or_fail_with("The notes of 0.3.0-rc.1 belong to an older release")
     }),

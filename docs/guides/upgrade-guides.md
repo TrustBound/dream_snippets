@@ -33,9 +33,9 @@ You need the package as a dev dependency:
 gleam add --dev dream_snippets
 ```
 
-You also need a git tag for each release, named exactly as the version in `gleam.toml`. The check reads the old code from that tag, so `0.1.0` must be a tag in your clone:
+You also need a git tag for each release, named exactly as the version in `gleam.toml`. The check reads the old code from that tag, so `0.1.0` must be a tag in your clone. You tag your own release commit, so this block is an illustration:
 
-```sh
+```sh illustration
 git tag 0.1.0
 git push origin 0.1.0
 ```
@@ -56,9 +56,9 @@ Use code at an older release only in a guide (a `.md` file under a `guides` dire
 
 ## Step 1: Show the old code at its release
 
-At `0.1.0`, the project had this snippet, `test/snippets/guide_upgrading_greet_lucy.gleam`, and its line 4 is the call your readers have in their code:
+At `0.1.0`, the project had this snippet, `test/snippets/guide_upgrading_greet_lucy.gleam`, and its line 4 is the call your readers have in their code. The block shows it with the line numbers that GitHub shows, so it's an illustration:
 
-```text
+```text illustration
 1  import my_app
 2
 3  pub fn greet_lucy() -> String {
@@ -66,12 +66,7 @@ At `0.1.0`, the project had this snippet, `test/snippets/guide_upgrading_greet_l
 5  }
 ```
 
-To find old lines, ask git for the file at the tag, and search the old release when you don't know which file:
-
-```sh
-git show 0.1.0:test/snippets/guide_upgrading_greet_lucy.gleam
-git grep 'greeting(' 0.1.0 -- .
-```
+To find old lines, ask git for the file at the tag with `git show 0.1.0:test/snippets/guide_upgrading_greet_lucy.gleam`. When you don't know which file, search the old release with `git grep 'greeting(' 0.1.0 -- .`.
 
 Give the block a heading with the code at an older release badge. The link is a `blob` link at the old tag, with the line range of the old code:
 
@@ -95,11 +90,9 @@ Its block holds `  my_app.greeting("Lucy", Formal)`, line 4 of the snippet as it
 
 ## Step 3: Show the change as a diff
 
-A diff block shows the change itself. Here's the real diff of `src/my_app.gleam` from `0.1.0` to the working tree:
+A diff block shows the change itself. Here's the real output of `git diff 0.1.0 -- src/my_app.gleam`, the diff from `0.1.0` to the working tree. The test of this guide runs git in the example project and compares its output with this file:
 
-```sh
-git diff 0.1.0 -- src/my_app.gleam
-```
+### The diff of the example project <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_upgrade_guides_git_diff.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
 diff --git a/src/my_app.gleam b/src/my_app.gleam
@@ -122,9 +115,9 @@ index 3a8f4d4..d72828d 100644
  }
 ```
 
-A diff block is an excerpt of that. It starts with the `--- a/<path>` and `+++ b/<path>` lines, then holds lines of the diff with their `-`, `+` or space prefix. Lines with no `@@` header between them must come from one hunk, in order, with nothing left out between them. To skip to a later hunk, put that hunk's `@@` line in the block. The guide of the example project shows the first four changed lines:
+A diff block is an excerpt of that. It starts with the `--- a/<path>` and `+++ b/<path>` lines, then holds lines of the diff with their `-`, `+` or space prefix. Lines with no `@@` header between them must come from one hunk, in order, with nothing left out between them. To skip to a later hunk, put that hunk's `@@` line in the block. The guide of the example project shows the first four changed lines. Its diff badge links to the repository of the example project, which this package can't check, so the example is an illustration:
 
-````text
+````text illustration
 #### The new signature <a href="https://github.com/me/my_app/compare/0.1.0...0.2.0#diff-dc300fec45bded4a328557d8cdb35d83594380337bd562985800e8086dc62ebd"><img align="right" alt="Tested diff" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-diff-lightgreen.svg?style=flat-square"></a>
 
 ```diff
@@ -137,39 +130,23 @@ A diff block is an excerpt of that. It starts with the `--- a/<path>` and `+++ b
 ```
 ````
 
-The badge links to GitHub's compare view, from the old tag to the version in `gleam.toml`. The anchor `#diff-<digest>` is GitHub's own anchor for one file in that view: the SHA-256 hex digest of the path. Work it out with a shell, or with `check.path_digest("src/my_app.gleam")`:
-
-```sh
-printf '%s' src/my_app.gleam | shasum -a 256
-```
-
-```text
-dc300fec45bded4a328557d8cdb35d83594380337bd562985800e8086dc62ebd  -
-```
+The badge links to GitHub's compare view, from the old tag to the version in `gleam.toml`. The anchor `#diff-<digest>` is GitHub's own anchor for one file in that view: the SHA-256 hex digest of the path. Work it out with a shell, `printf '%s' src/my_app.gleam | shasum -a 256`, or with `check.path_digest`. For `src/my_app.gleam`, the test of this guide asserts that it's `dc300fec45bded4a328557d8cdb35d83594380337bd562985800e8086dc62ebd`.
 
 ## Step 4: Run the check
 
-```sh
-gleam run -m dream_snippets
-```
+Run `gleam run -m dream_snippets`:
+
+### The summary of the upgrade guide <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_upgrade_guides_passes.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
-2 blocks and 1 diff block checked in 2 files, 0 problems
+2 blocks and 1 diff block checked in 2 files, 0 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 Two Gleam blocks passed: the old call against `0.1.0`, and the new call against the working tree. The diff block passed against the real diff. Diff blocks have their own count in the summary.
 
 ## Step 5: Run it in CI with the tags
 
-`actions/checkout` makes a shallow clone with no tags, and then the check can't find `0.1.0`. Check out the whole history:
-
-```yaml
-- uses: actions/checkout@v4
-  with:
-    fetch-depth: 0
-- name: Check docs snippets
-  run: gleam run -m dream_snippets
-```
+`actions/checkout` makes a shallow clone with no tags, and then the check can't find `0.1.0`. Check out the whole history with `fetch-depth: 0`, as the workflow in [Getting started](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/getting-started.md#step-7-run-the-check-in-ci) does.
 
 ## When the check fails
 
@@ -177,42 +154,52 @@ Each of these is the real output for the example project with one thing wrong. F
 
 **The old tag isn't in the clone.** Both blocks that need it fail:
 
+### The messages of a missing tag <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_upgrade_guides_no_tag.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 docs/guides/upgrading.md:7: the tag 0.1.0 is not in this clone; fetch the tags with "git fetch --tags" (a shallow clone has none)
 docs/guides/upgrading.md:19: the tag 0.1.0 is not in this clone; fetch the tags with "git fetch --tags" (a shallow clone has none)
-2 blocks and 1 diff block checked in 2 files, 2 problems
+2 blocks and 1 diff block checked in 2 files, 2 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 Run `git fetch --tags` locally, and use `fetch-depth: 0` in CI. If the tag never existed, tag the release commit.
 
 **The old code names the current version.** Code at `0.2.0` is current code, so it needs a tested snippet instead:
 
+### The message of old code at the current version <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_upgrade_guides_current_version.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 docs/guides/upgrading.md:7: the tag 0.2.0 is not a release before 0.2.0, the version in gleam.toml, so use the tested snippet badge for this code
-2 blocks and 1 diff block checked in 2 files, 1 problem
+2 blocks and 1 diff block checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 **A diff line isn't in the real diff.** Here the block says `style: Style, loud: Bool`, a change that never happened:
 
+### The message of a diff line that is not in the diff <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_upgrade_guides_diff_line.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 docs/guides/upgrading.md:24: this line is not in "git diff 0.1.0 -- src/my_app.gleam" at this place; a diff block shows lines of the real diff, in order and contiguous within a hunk
-2 blocks and 1 diff block checked in 2 files, 1 problem
+2 blocks and 1 diff block checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 Copy the lines from `git diff <tag> -- <path>` again. A line also fails when it's real but out of place, for example after a line that the block skipped.
 
 **The anchor names another file.** The message gives you the right one:
 
+### The message of the anchor of another file <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_upgrade_guides_anchor.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 docs/guides/upgrading.md:19: the compare link anchor is not the one for src/my_app.gleam; use #diff-dc300fec45bded4a328557d8cdb35d83594380337bd562985800e8086dc62ebd
-2 blocks and 1 diff block checked in 2 files, 1 problem
+2 blocks and 1 diff block checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 **Old code in the README.** The README shows only what works now:
 
+### The message of old code in the README <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_upgrade_guides_readme.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 README.md:5: the code at an older release badge is only allowed in the guides under docs/guides and in release notes, because the README, the changelog and doc comments show only code of the current version
-3 blocks and 1 diff block checked in 3 files, 1 problem
+3 blocks and 1 diff block checked in 3 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 [Fix a failed check](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/fixing-check-failures.md#diff-blocks) lists the rest: a malformed badge, a missing file header, a file with no changes, an unsafe tag, a file that doesn't exist at the tag, and more.

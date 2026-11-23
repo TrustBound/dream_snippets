@@ -16,6 +16,8 @@ pub fn check_my_release_notes() -> Report {
       badge_guide: "CONTRIBUTING.md",
       release_notes_guide: "CONTRIBUTING.md",
       guides: ["docs/guides"],
+      tested_files: ["test", ".github"],
+      dependencies: [],
     )
   let context =
     CheckContext(
@@ -34,7 +36,7 @@ pub fn check_my_release_notes() -> Report {
     <> heading
     <> "\n\n```gleam\npub const answer = 41\n```\n"
   // The old code block passes. The notes have no sections, so it returns
-  // Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
+  // Report(..empty_report(), blocks_checked: 1, problems: [
   //   Problem(file, 1, MissingReleaseNotesSection("Key Highlights")),
   //   Problem(file, 1, MissingReleaseNotesSection("What's New")),
   //   Problem(file, 1, MissingReleaseNotesSection("Testing")),

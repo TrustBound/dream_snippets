@@ -17,6 +17,8 @@ pub fn check_my_source() -> Report {
       badge_guide: "CONTRIBUTING.md",
       release_notes_guide: "CONTRIBUTING.md",
       guides: ["docs/guides"],
+      tested_files: ["test", ".github"],
+      dependencies: [],
     )
   let context =
     CheckContext(
@@ -40,7 +42,7 @@ pub fn hello() -> Nil {
   Nil
 }
 "
-  // Returns Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
+  // Returns Report(..empty_report(), blocks_checked: 1, problems: [
   //   Problem(file: "src/app.gleam", line: 3, reason: MissingBadgeHeading),
   // ])
   check.check_gleam_source("src/app.gleam", source, context)

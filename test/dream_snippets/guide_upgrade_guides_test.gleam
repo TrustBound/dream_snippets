@@ -3,12 +3,13 @@
 //// at the release 0.1.0, tags it with real git, changes it to 0.2.0, and
 //// checks the upgrade guide that the guide shows.
 
-import dream_snippets.{type Output, Output}
+import dream_snippets.{type Output}
 import dream_snippets/check
 import dream_snippets/git.{Git}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/suite.{type TestSuite}
 import dream_test/unit.{describe, it}
+import fixtures/guide_project
 import fixtures/project
 import gleam/list
 import gleam/string
@@ -60,29 +61,6 @@ const new_snippet =
 pub fn greet_lucy() -> String {
   my_app.greeting(\"Lucy\", Formal)
 }
-"
-
-/// The output of `git diff 0.1.0 -- src/my_app.gleam` that the guide
-/// shows.
-const real_diff =
-  "diff --git a/src/my_app.gleam b/src/my_app.gleam
-index 3a8f4d4..d72828d 100644
---- a/src/my_app.gleam
-+++ b/src/my_app.gleam
-@@ -1,3 +1,11 @@
--pub fn greeting(name: String) -> String {
--  \"Hello, \" <> name <> \"!\"
-+pub fn greeting(name: String, style: Style) -> String {
-+  case style {
-+    Casual -> \"Hi, \" <> name <> \"!\"
-+    Formal -> \"Hello, \" <> name <> \".\"
-+  }
-+}
-+
-+pub type Style {
-+  Casual
-+  Formal
- }
 "
 
 const snippet_path = "test/snippets/guide_upgrading_greet_lucy.gleam"
@@ -191,15 +169,9 @@ pub fn tests() -> TestSuite {
         )
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        standard_output: [
-          "2 blocks and 1 diff block checked in 2 files, 0 problems",
-        ],
-        standard_error: [],
-        exit_status: 0,
-      ))
+      |> be_equal(#(guide_project.output_file("guide_upgrade_guides_passes"), 0))
       |> or_fail_with("The upgrade guide should pass")
     }),
     it("step 3: git diff shows the change of the signature", fn() {
@@ -226,7 +198,9 @@ pub fn tests() -> TestSuite {
       // Assert
       diff
       |> should
-      |> be_equal(Ok(real_diff))
+      |> be_equal(
+        Ok(guide_project.output_file("guide_upgrade_guides_git_diff")),
+      )
       |> or_fail_with("The diff should be the one the guide shows")
     }),
     it("fails when the old tag is not in the clone", fn() {
@@ -240,17 +214,9 @@ pub fn tests() -> TestSuite {
         )
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        standard_output: [
-          "docs/guides/upgrading.md:7: the tag 0.1.0 is not in this clone; fetch the tags with \"git fetch --tags\" (a shallow clone has none)",
-          "docs/guides/upgrading.md:19: the tag 0.1.0 is not in this clone; fetch the tags with \"git fetch --tags\" (a shallow clone has none)",
-          "2 blocks and 1 diff block checked in 2 files, 2 problems",
-        ],
-        standard_error: [],
-        exit_status: 1,
-      ))
+      |> be_equal(#(guide_project.output_file("guide_upgrade_guides_no_tag"), 1))
       |> or_fail_with("A missing tag should fail both blocks")
     }),
     it("fails old code at the current version", fn() {
@@ -264,15 +230,11 @@ pub fn tests() -> TestSuite {
         )
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        standard_output: [
-          "docs/guides/upgrading.md:7: the tag 0.2.0 is not a release before 0.2.0, the version in gleam.toml, so use the tested snippet badge for this code",
-          "2 blocks and 1 diff block checked in 2 files, 1 problem",
-        ],
-        standard_error: [],
-        exit_status: 1,
+      |> be_equal(#(
+        guide_project.output_file("guide_upgrade_guides_current_version"),
+        1,
       ))
       |> or_fail_with("Old code must be at an older release")
     }),
@@ -295,15 +257,11 @@ pub fn tests() -> TestSuite {
         )
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        standard_output: [
-          "docs/guides/upgrading.md:24: this line is not in \"git diff 0.1.0 -- src/my_app.gleam\" at this place; a diff block shows lines of the real diff, in order and contiguous within a hunk",
-          "2 blocks and 1 diff block checked in 2 files, 1 problem",
-        ],
-        standard_error: [],
-        exit_status: 1,
+      |> be_equal(#(
+        guide_project.output_file("guide_upgrade_guides_diff_line"),
+        1,
       ))
       |> or_fail_with("The changed line should not be in the diff")
     }),
@@ -318,16 +276,9 @@ pub fn tests() -> TestSuite {
         )
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        standard_output: [
-          "docs/guides/upgrading.md:19: the compare link anchor is not the one for src/my_app.gleam; use #diff-dc300fec45bded4a328557d8cdb35d83594380337bd562985800e8086dc62ebd",
-          "2 blocks and 1 diff block checked in 2 files, 1 problem",
-        ],
-        standard_error: [],
-        exit_status: 1,
-      ))
+      |> be_equal(#(guide_project.output_file("guide_upgrade_guides_anchor"), 1))
       |> or_fail_with("The anchor should name the file of the block")
     }),
     it("fails old code in the README", fn() {
@@ -345,16 +296,9 @@ pub fn tests() -> TestSuite {
         )
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        standard_output: [
-          "README.md:5: the code at an older release badge is only allowed in the guides under docs/guides and in release notes, because the README, the changelog and doc comments show only code of the current version",
-          "3 blocks and 1 diff block checked in 3 files, 1 problem",
-        ],
-        standard_error: [],
-        exit_status: 1,
-      ))
+      |> be_equal(#(guide_project.output_file("guide_upgrade_guides_readme"), 1))
       |> or_fail_with("The README shows only current code")
     }),
   ])

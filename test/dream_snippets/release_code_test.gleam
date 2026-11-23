@@ -285,9 +285,14 @@ fn section_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
-          Problem("CHANGELOG.md", 7, check.MissingBadgeHeading),
-        ]),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [
+            Problem("CHANGELOG.md", 7, check.MissingBadgeHeading),
+          ],
+        ),
       )
       |> or_fail_with("The gleam block is in the Unreleased section")
     }),

@@ -59,7 +59,6 @@ You need the package as a dev dependency, and a `releases/` directory at the pro
 
 ```sh
 gleam add --dev dream_snippets
-mkdir -p releases
 ```
 
 The examples use the project `my_app` at version `0.2.0`, in the GitHub repository `me/my_app`.
@@ -72,6 +71,19 @@ Every release notes file has one of these two sections, never both:
 |:---|:---|:---|
 | The first release of the package | `## Installing` | There is nothing to upgrade from. Show how to add the package and run it. |
 | Any later release | `## Upgrading` with `### Migration Guide` | A reader on the old version needs the steps to move, even when the steps are "nothing to change". |
+
+Both sections show the reader how to get the release. `## Upgrading` shows the new requirement and the command that updates it, and `## Installing` shows `gleam add`. The check proves these blocks with `gleam.toml`, with no file: the package is the package of the project, and the requirement is the one that `gleam add` writes for the release of the notes. For this package at `1.0.0`, they are:
+
+```toml
+[dependencies]
+dream_snippets = ">= 1.0.0 and < 2.0.0"
+```
+
+```sh
+gleam deps update dream_snippets
+```
+
+In the notes of `1.0.0`, the requirement stays `>= 1.0.0 and < 2.0.0` after later version bumps. [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md#step-8-show-packages-to-add) lists exactly what the check reads in these lines.
 
 The `Upgrading` section can show the old code next to the new code. Release notes may hold code at an older release, as [Show an API change in an upgrade guide](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/upgrade-guides.md) explains.
 
@@ -139,12 +151,12 @@ Add a style to each call of `greeting`: `Casual` for "Hi, Lucy!", or `Formal` fo
 
 ## Step 4: Run the check
 
-```sh
-gleam run -m dream_snippets
-```
+Run `gleam run -m dream_snippets`. For the complete file, it prints:
+
+### The summary of the complete file <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_release_notes_template_complete.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
-0 blocks and 0 diff blocks checked in 2 files, 0 problems
+0 blocks and 0 diff blocks checked in 2 files, 0 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 The two files are `releases/release-0.2.0.md` and `src/my_app.gleam`. The template check adds no blocks to the count, but each mistake is a problem line, as the next section shows.
@@ -155,65 +167,83 @@ Each example below is the complete file above with one mistake, and the output o
 
 **The title names another version.** The title says `0.1.0` in `release-0.2.0.md`. *Fix:* use the version of the file name.
 
+### The title message <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_release_notes_template_title.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 releases/release-0.2.0.md:1: the first line is "# my_app 0.1.0 Release Notes", but the template wants the title "# <Name> 0.2.0 Release Notes"; see "Release notes template" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html
-0 blocks and 0 diff blocks checked in 2 files, 1 problem
+0 blocks and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 **No release date.** *Fix:* add a `**Release Date:**` line before the first section.
 
+### The release date message <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_release_notes_template_date.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 releases/release-0.2.0.md:1: there is no line that starts with "**Release Date:**" between the title and the first section, but the template wants one there; see "Release notes template" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html
-0 blocks and 0 diff blocks checked in 2 files, 1 problem
+0 blocks and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 **A section that isn't in the template.** *Fix:* make it a `###` heading inside a template section, or drop it.
 
+### The unknown section message <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_release_notes_template_unknown.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 releases/release-0.2.0.md:17: "## Files changed" is not a section of the release notes template; see "Release notes template" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html
-0 blocks and 0 diff blocks checked in 2 files, 1 problem
+0 blocks and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 **A section out of order.** Here `Testing` comes after `Upgrading`. *Fix:* move it to its place in the list.
 
+### The section order message <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_release_notes_template_order.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 releases/release-0.2.0.md:26: "## Testing" comes after "## Upgrading", but the template has it before "## Upgrading"; see "Release notes template" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html
-0 blocks and 0 diff blocks checked in 2 files, 1 problem
+0 blocks and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 **A section two times.** *Fix:* merge the two into one.
 
+### The repeated section message <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_release_notes_template_repeated.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 releases/release-0.2.0.md:17: "## What's New" is in the file again (first at line 11), but the template has each section one time at most; see "Release notes template" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html
-0 blocks and 0 diff blocks checked in 2 files, 1 problem
+0 blocks and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 **Both `Upgrading` and `Installing`.** *Fix:* keep `Upgrading` for a later release, or `Installing` for the first one.
 
+### The message of both choices <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_release_notes_template_both.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 releases/release-0.2.0.md:27: "## Upgrading" and "## Installing" are both in the file, but the template allows only one of them; see "Release notes template" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html
-0 blocks and 0 diff blocks checked in 2 files, 1 problem
+0 blocks and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 **A required section is missing.** Here `Testing` is gone. *Fix:* add it, even with one line.
 
+### The missing section message <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_release_notes_template_missing.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 releases/release-0.2.0.md:1: the section "## Testing" is missing, but the template requires it; see "Release notes template" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html
-0 blocks and 0 diff blocks checked in 2 files, 1 problem
+0 blocks and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 **Neither `Upgrading` nor `Installing`.** *Fix:* add the one that fits, as in [Upgrading or Installing](#upgrading-or-installing).
 
+### The message of no choice <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_release_notes_template_neither.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 releases/release-0.2.0.md:1: neither "## Upgrading" nor "## Installing" is in the file, but the template requires one of them; see "Release notes template" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html
-0 blocks and 0 diff blocks checked in 2 files, 1 problem
+0 blocks and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 **`Upgrading` without `### Migration Guide`.** *Fix:* add the heading inside `Upgrading`, before the next `##` section.
 
+### The migration guide message <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_release_notes_template_migration.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 releases/release-0.2.0.md:21: "## Upgrading" has no "### Migration Guide", but the template requires it in that section; see "Release notes template" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html
-0 blocks and 0 diff blocks checked in 2 files, 1 problem
+0 blocks and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 A missing part is reported at line 1. A section in the wrong place is reported at its heading. A file named on its own in a `release_notes` setting, with a name that isn't `release-<version>.md`, gets one message at line 1, as [Fix a failed check](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/fixing-check-failures.md#release-notes) shows.

@@ -1,0 +1,3 @@
+docs/guides/upgrading.md:7: the tag 0.1.0 is not in this clone; fetch the tags with "git fetch --tags" (a shallow clone has none)
+docs/guides/upgrading.md:19: the tag 0.1.0 is not in this clone; fetch the tags with "git fetch --tags" (a shallow clone has none)
+2 blocks and 1 diff block checked in 2 files, 2 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks

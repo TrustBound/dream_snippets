@@ -91,7 +91,7 @@ fn check_project_tests() -> UnitNode {
           #("gleam.toml", project_toml),
           #("README.md", readme),
           #("test/snippets/hello.gleam", "pub fn hello() {\n  \"hi\"\n}\n"),
-          #("docs/guide.md", "```bash\ngleam run\n```\n"),
+          #("docs/guide.md", "```bash illustration\ngleam run\n```\n"),
           #("docs/guides/hello.md", guide),
           #("docs/deep/more.md", "Text.\n"),
           #("docs/notes.txt", untested),
@@ -114,7 +114,7 @@ fn check_project_tests() -> UnitNode {
       |> should
       |> be_equal(Output(
         standard_output: [
-          "2 blocks and 1 diff block checked in 7 files, 0 problems",
+          "2 blocks and 1 diff block checked in 7 files, 0 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 1 illustration block",
         ],
         standard_error: [],
         exit_status: 0,
@@ -147,7 +147,7 @@ fn check_project_tests() -> UnitNode {
       |> be_equal(Output(
         standard_output: [
           "README.md:5: the code at an older release badge is only allowed in the guides under docs/guides and in release notes, because the README, the changelog and doc comments show only code of the current version",
-          "2 blocks and 0 diff blocks checked in 3 files, 1 problem",
+          "2 blocks and 0 diff blocks checked in 3 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
         ],
         standard_error: [],
         exit_status: 1,
@@ -159,7 +159,7 @@ fn check_project_tests() -> UnitNode {
       let assert Ok(directory) =
         project.write_project("project_problems", [
           #("gleam.toml", project_toml),
-          #("docs/a.md", "```text\nimport gleam/io\n```\n"),
+          #("docs/a.md", "```text illustration\nimport gleam/io\n```\n"),
           #("README.md", "```gleam\nx\n```\n"),
         ])
 
@@ -173,8 +173,8 @@ fn check_project_tests() -> UnitNode {
       |> be_equal(Output(
         standard_output: [
           "README.md:1: this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)",
-          "docs/a.md:2: this line looks like Gleam code in a text code fence; put Gleam code in a gleam block with the tested snippet badge",
-          "1 block and 0 diff blocks checked in 2 files, 2 problems",
+          "docs/a.md:2: this line looks like Gleam code in a text illustration code fence; put Gleam code in a gleam block with the tested snippet badge",
+          "1 block and 0 diff blocks checked in 2 files, 2 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 1 illustration block",
         ],
         standard_error: [],
         exit_status: 1,
@@ -208,7 +208,7 @@ fn check_project_tests() -> UnitNode {
           standard_output: [
             "releases/release-1.1.0.md:1: the section \"## Testing\" is missing, but the template requires it; see \"Release notes template\" in docs/releasing.md",
             "releases/release-1.1.0.md:17: this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)",
-            "1 block and 0 diff blocks checked in 1 file, 2 problems",
+            "1 block and 0 diff blocks checked in 1 file, 2 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
           ],
           standard_error: [],
           exit_status: 1,
@@ -242,7 +242,7 @@ fn check_project_tests() -> UnitNode {
         Ok(Output(
           standard_output: [
             "notes/release-1.1.0.md:1: the section \"## Testing\" is missing, but the template requires it; see \"Release notes template\" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
-            "0 blocks and 0 diff blocks checked in 1 file, 1 problem",
+            "0 blocks and 0 diff blocks checked in 1 file, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
           ],
           standard_error: [],
           exit_status: 1,
@@ -272,7 +272,7 @@ fn check_project_tests() -> UnitNode {
       |> be_equal(
         Ok(Output(
           standard_output: [
-            "0 blocks and 0 diff blocks checked in 0 files, 0 problems",
+            "0 blocks and 0 diff blocks checked in 0 files, 0 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
           ],
           standard_error: [],
           exit_status: 0,
@@ -305,7 +305,7 @@ fn check_project_tests() -> UnitNode {
           Ok(Output(
             standard_output: [
               "notes/latest.md:1: a release notes file must be named \"release-<version>.md\", for example \"release-1.2.0.md\"; see \"Release notes template\" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
-              "0 blocks and 0 diff blocks checked in 1 file, 1 problem",
+              "0 blocks and 0 diff blocks checked in 1 file, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
             ],
             standard_error: [],
             exit_status: 1,
@@ -340,7 +340,7 @@ fn check_project_tests() -> UnitNode {
           standard_output: [
             "CHANGELOG.md:3: this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)",
             "README.md:3: the tested snippet badge is not in the exact format; copy it from https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html",
-            "2 blocks and 0 diff blocks checked in 2 files, 2 problems",
+            "2 blocks and 0 diff blocks checked in 2 files, 2 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
           ],
           standard_error: [],
           exit_status: 1,

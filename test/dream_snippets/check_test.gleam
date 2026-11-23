@@ -225,22 +225,38 @@ fn summary_tests() -> UnitNode {
   group("summary", [
     it("uses the singular for 1", fn() {
       // Act
-      let line = check.summary(1, 1, 1, 1)
+      let report =
+        Report(
+          blocks_checked: 1,
+          diff_blocks_checked: 1,
+          file_blocks_checked: 1,
+          command_blocks_checked: 1,
+          output_blocks_checked: 1,
+          illustration_blocks: 1,
+          problems: [Problem("doc.md", 1, UnclosedFence)],
+        )
+
+      // Act
+      let line = check.summary(report, 1)
 
       // Assert
       line
       |> should
-      |> be_equal("1 block and 1 diff block checked in 1 file, 1 problem")
+      |> be_equal(
+        "1 block and 1 diff block checked in 1 file, 1 problem; 1 file block, 1 command block and 1 output block checked; 1 illustration block",
+      )
       |> or_fail_with("1 should take the singular")
     }),
     it("uses the plural for 0", fn() {
       // Act
-      let line = check.summary(0, 0, 0, 0)
+      let line = check.summary(check.empty_report(), 0)
 
       // Assert
       line
       |> should
-      |> be_equal("0 blocks and 0 diff blocks checked in 0 files, 0 problems")
+      |> be_equal(
+        "0 blocks and 0 diff blocks checked in 0 files, 0 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
+      )
       |> or_fail_with("0 should take the plural")
     }),
   ])
@@ -350,7 +366,12 @@ fn fence_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("A ~~~ fence should be checked like a ``` fence")
     }),
@@ -370,7 +391,12 @@ fn fence_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("The language should be gleam")
     }),
@@ -387,7 +413,12 @@ fn fence_tests() -> UnitNode {
         report
         |> should
         |> be_equal(
-          Report(blocks_checked: 0, diff_blocks_checked: 0, problems: []),
+          Report(
+            ..check.empty_report(),
+            blocks_checked: 0,
+            diff_blocks_checked: 0,
+            problems: [],
+          ),
         )
         |> or_fail_with("The line is inline code, not a fence")
       },
@@ -410,7 +441,12 @@ fn fence_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("The fence indent should not count as code")
     }),
@@ -471,7 +507,12 @@ fn fence_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 0, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 0,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("A ///// line should not be read as a doc comment")
     }),
@@ -753,7 +794,12 @@ fn snippet_file_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("The last line has no newline and should still match")
     }),
@@ -803,7 +849,12 @@ fn snippet_file_tests() -> UnitNode {
         report
         |> should
         |> be_equal(
-          Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+          Report(
+            ..check.empty_report(),
+            blocks_checked: 1,
+            diff_blocks_checked: 0,
+            problems: [],
+          ),
         )
         |> or_fail_with("The module comment alone should be left out")
       },
@@ -896,7 +947,12 @@ fn more_diff_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 0, diff_blocks_checked: 1, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 0,
+          diff_blocks_checked: 1,
+          problems: [],
+        ),
       )
       |> or_fail_with("The last line of the diff should be found")
     }),
@@ -945,6 +1001,8 @@ fn describe_tests() -> UnitNode {
       badge_guide: "CONTRIBUTING.md",
       release_notes_guide: "RELEASING.md",
       guides: ["docs/guides"],
+      tested_files: ["test", ".github"],
+      dependencies: [],
     )
   group("describe_reason", [
     it("describes every reason of a snippet block", fn() {
@@ -1103,7 +1161,12 @@ fn passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("A whole-file block should pass")
     }),
@@ -1124,7 +1187,12 @@ fn passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("A block without the module comment should pass")
     }),
@@ -1144,7 +1212,12 @@ fn passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("A #L7-L9 block should pass")
     }),
@@ -1164,7 +1237,12 @@ fn passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("A #L8 block should pass")
     }),
@@ -1193,7 +1271,12 @@ fn passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("A /// doc comment block should pass")
     }),
@@ -1217,7 +1300,12 @@ fn passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("A //// module comment block should pass")
     }),
@@ -1244,7 +1332,12 @@ fn passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("An indented doc comment block should pass")
     }),
@@ -1265,17 +1358,24 @@ fn passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("A tested block inside a markdown example should pass")
     }),
-    it("shell, JavaScript, Elixir and TOML fences", fn() {
+    it("shell, JavaScript, Elixir and TOML illustrations", fn() {
       // Arrange
       let lines = [
-        "```bash", "gleam run -m dream_snippets", "make check | tee log", "```",
-        "```javascript", "import { x } from \"./a/b.js\";", "let total = 1;",
-        "```", "```elixir", "Enum.map(list, fn x -> x end)", "|> Enum.sum()",
-        "```", "```toml", "[dependencies]", "dream = \">= 3.0.0\"", "```", "```",
+        "```bash illustration", "gleam run -m dream_snippets",
+        "make check | tee log", "```", "```javascript illustration",
+        "import { x } from \"./a/b.js\";", "let total = 1;", "```",
+        "```elixir illustration", "Enum.map(list, fn x -> x end)",
+        "|> Enum.sum()", "```", "```toml illustration", "[dependencies]",
+        "dream = \">= 3.0.0\"", "```", "```typescript illustration",
         "type User = { id: number }", "```",
       ]
 
@@ -1285,10 +1385,8 @@ fn passing_tests() -> UnitNode {
       // Assert
       report
       |> should
-      |> be_equal(
-        Report(blocks_checked: 0, diff_blocks_checked: 0, problems: []),
-      )
-      |> or_fail_with("Fences in other languages should pass")
+      |> be_equal(Report(..check.empty_report(), illustration_blocks: 5))
+      |> or_fail_with("Illustrations in other languages should pass")
     }),
   ])
 }
@@ -1568,10 +1666,14 @@ fn failing_tests() -> UnitNode {
       ])
       |> or_fail_with("The old Tested source form should fail")
     }),
-    it("Gleam code in a text fence", fn() {
+    it("Gleam code in a text illustration", fn() {
       // Arrange
       let lines =
-        list.flatten([["Prose.", "", "```text"], main_function(), ["```"]])
+        list.flatten([
+          ["Prose.", "", "```text illustration"],
+          main_function(),
+          ["```"],
+        ])
 
       // Act
       let report = check(lines)
@@ -1579,10 +1681,12 @@ fn failing_tests() -> UnitNode {
       // Assert
       report.problems
       |> should
-      |> be_equal([Problem("doc.md", 4, HiddenGleamCode("text"))])
-      |> or_fail_with("Gleam code in a text fence should fail")
+      |> be_equal([
+        Problem("doc.md", 4, HiddenGleamCode("text illustration")),
+      ])
+      |> or_fail_with("Gleam code in a text illustration should fail")
     }),
-    it("Gleam code in a fence with no language", fn() {
+    it("a fence with no language, with Gleam code in it", fn() {
       // Arrange
       let lines = ["```", "import dream/http.{type Request}", "```"]
 
@@ -1592,8 +1696,8 @@ fn failing_tests() -> UnitNode {
       // Assert
       report.problems
       |> should
-      |> be_equal([Problem("doc.md", 2, HiddenGleamCode(""))])
-      |> or_fail_with("Gleam code in a bare fence should fail")
+      |> be_equal([Problem("doc.md", 1, check.UnlabelledFence)])
+      |> or_fail_with("A bare fence should fail at its opening line")
     }),
     it("an untested gleam block inside a ````markdown example", fn() {
       // Arrange
@@ -1623,7 +1727,10 @@ fn report_tests() -> UnitNode {
       let second =
         check(
           list.flatten([
-            ["```text", "use x <- result.try(y)", "```", "```gleam"],
+            [
+              "```text illustration", "use x <- result.try(y)", "```",
+              "```gleam",
+            ],
             main_function(),
             ["```"],
           ]),
@@ -1645,7 +1752,7 @@ fn report_tests() -> UnitNode {
       |> be_equal([
         Problem("a.md", 1, MissingBadgeHeading),
         Problem("a.md", 4, MissingBadgeHeading),
-        Problem("doc.md", 2, HiddenGleamCode("text")),
+        Problem("doc.md", 2, HiddenGleamCode("text illustration")),
         Problem("doc.md", 4, MissingBadgeHeading),
       ])
       |> or_fail_with("All problems should be reported, sorted")
@@ -1668,16 +1775,28 @@ fn report_tests() -> UnitNode {
     }),
     it("writes the summary line", fn() {
       // Arrange
-      let blocks = 509
+      let report =
+        Report(
+          blocks_checked: 509,
+          diff_blocks_checked: 5,
+          file_blocks_checked: 3,
+          command_blocks_checked: 40,
+          output_blocks_checked: 52,
+          illustration_blocks: 2,
+          problems: [
+            Problem("doc.md", 1, UnclosedFence),
+            Problem("doc.md", 9, UnclosedFence),
+          ],
+        )
 
       // Act
-      let line = check.summary(blocks, 5, 84, 2)
+      let line = check.summary(report, 84)
 
       // Assert
       line
       |> should
       |> be_equal(
-        "509 blocks and 5 diff blocks checked in 84 files, 2 problems",
+        "509 blocks and 5 diff blocks checked in 84 files, 2 problems; 3 file blocks, 40 command blocks and 52 output blocks checked; 2 illustration blocks",
       )
       |> or_fail_with("The summary should count blocks, files and problems")
     }),
@@ -1702,7 +1821,12 @@ fn diff_passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 0, diff_blocks_checked: 1, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 0,
+          diff_blocks_checked: 1,
+          problems: [],
+        ),
       )
       |> or_fail_with("Real diff lines with no hunk header should pass")
     }),
@@ -1725,7 +1849,12 @@ fn diff_passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 0, diff_blocks_checked: 1, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 0,
+          diff_blocks_checked: 1,
+          problems: [],
+        ),
       )
       |> or_fail_with(
         "Two hunks with their headers should pass, and the Gleam context line should not count as hidden Gleam code",
@@ -1747,7 +1876,12 @@ fn diff_passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 0, diff_blocks_checked: 1, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 0,
+          diff_blocks_checked: 1,
+          problems: [],
+        ),
       )
       |> or_fail_with("The full hunk header line should pass")
     }),

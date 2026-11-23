@@ -46,6 +46,34 @@ pub const tight_snippet_source =
 pub const answer = 42
 "
 
+/// A workflow file under `.github`, a tested file of the fake project.
+pub const workflow_path = ".github/workflows/ci.yml"
+
+pub const workflow_source =
+  "name: CI
+on: push
+jobs:
+  test:
+    steps:
+      - run: gleam test
+"
+
+/// A script under `test`, a tested file of the fake project.
+pub const script_path = "test/scripts/check.sh"
+
+pub const script_source = "#!/bin/sh\nset -eu\ngleam test\n"
+
+/// An output file under `test`, a tested file of the fake project.
+pub const output_path = "test/outputs/summary.txt"
+
+pub const output_source =
+  "1 block and 0 diff blocks checked in 1 file, 0 problems\n"
+
+/// A file that is not under a tested file of the fake project.
+pub const untested_path = "docs/example.yml"
+
+pub const untested_source = "name: example\n"
+
 /// A snippet file that cannot be read.
 pub const unreadable_path = "test/snippets/locked.gleam"
 
@@ -122,6 +150,8 @@ pub fn project() -> Project {
     badge_guide: "docs/contributing/contributing.md",
     release_notes_guide: "docs/contributing/release-notes.md",
     guides: ["docs/guides"],
+    tested_files: ["test", ".github"],
+    dependencies: [],
   )
 }
 
@@ -170,6 +200,10 @@ fn read_fake_source(path: String) -> Result(String, simplifile.FileError) {
     #(tight_snippet_path, tight_snippet_source),
     #(guide_path, guide_source()),
     #(other_guide_path, "# Other guide\n\n## Setup\n"),
+    #(workflow_path, workflow_source),
+    #(script_path, script_source),
+    #(output_path, output_source),
+    #(untested_path, untested_source),
   ]
   case path == unreadable_path || path == unreadable_guide_path {
     True -> Error(simplifile.Eacces)

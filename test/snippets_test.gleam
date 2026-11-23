@@ -16,6 +16,7 @@ import fixtures/project
 import gleam/option.{Some}
 import gleam/order
 import simplifile
+import snippets/doc_add_report
 import snippets/doc_changelog_section_name
 import snippets/doc_check_changelog
 import snippets/doc_check_gleam_source
@@ -23,6 +24,7 @@ import snippets/doc_check_project
 import snippets/doc_check_readme
 import snippets/doc_check_release_notes
 import snippets/doc_check_release_notes_template
+import snippets/doc_classify_fence
 import snippets/doc_compare_versions
 import snippets/doc_default_roots
 import snippets/doc_describe_check_error
@@ -32,6 +34,7 @@ import snippets/doc_describe_problem
 import snippets/doc_describe_reason
 import snippets/doc_diff_between_tags
 import snippets/doc_diff_from_tag
+import snippets/doc_empty_report
 import snippets/doc_file_at_tag
 import snippets/doc_heading_anchors
 import snippets/doc_heading_slug
@@ -40,6 +43,7 @@ import snippets/doc_is_checked_release_notes
 import snippets/doc_is_guide_path
 import snippets/doc_is_safe_path
 import snippets/doc_is_safe_tag
+import snippets/doc_is_tested_file
 import snippets/doc_looks_like_gleam
 import snippets/doc_one_line
 import snippets/doc_output
@@ -56,6 +60,7 @@ import snippets/doc_parse_release_version
 import snippets/doc_parse_snippet_link
 import snippets/doc_path_digest
 import snippets/doc_release_notes_version
+import snippets/doc_release_requirement
 import snippets/doc_repository_url
 import snippets/doc_run_git
 import snippets/doc_sort_problems
@@ -77,9 +82,14 @@ pub fn tests() -> TestSuite {
         report
         |> should
         |> be_equal(
-          Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
-            Problem("docs/guide.md", 3, MissingBadgeHeading),
-          ]),
+          Report(
+            ..check.empty_report(),
+            blocks_checked: 1,
+            diff_blocks_checked: 0,
+            problems: [
+              Problem("docs/guide.md", 3, MissingBadgeHeading),
+            ],
+          ),
         )
         |> or_fail_with("The block should fail for its missing heading")
       }),
@@ -101,6 +111,8 @@ pub fn tests() -> TestSuite {
               badge_guide: "https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html",
               release_notes_guide: "https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
               guides: ["docs/guides"],
+              tested_files: ["test", ".github"],
+              dependencies: [],
             ),
             roots: [
               CheckedRoot("README.md", MarkdownDocument, MayBeMissing),
@@ -136,7 +148,7 @@ pub fn tests() -> TestSuite {
         lines
         |> should
         |> be_equal([
-          "0 blocks and 0 diff blocks checked in 1 file, 0 problems",
+          "0 blocks and 0 diff blocks checked in 1 file, 0 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks",
         ])
         |> or_fail_with("The summary should count one file")
       }),
@@ -249,9 +261,14 @@ pub fn tests() -> TestSuite {
         result
         |> should
         |> be_equal(
-          Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
-            Problem("CHANGELOG.md", 5, MissingBadgeHeading),
-          ]),
+          Report(
+            ..check.empty_report(),
+            blocks_checked: 1,
+            diff_blocks_checked: 0,
+            problems: [
+              Problem("CHANGELOG.md", 5, MissingBadgeHeading),
+            ],
+          ),
         )
         |> or_fail_with("The 0.9.0 section should be left out")
       }),
@@ -322,7 +339,9 @@ pub fn tests() -> TestSuite {
         // Assert
         result
         |> should
-        |> be_equal("12 blocks and 2 diff blocks checked in 9 files, 1 problem")
+        |> be_equal(
+          "12 blocks and 2 diff blocks checked in 9 files, 1 problem; 0 file blocks, 1 command block and 4 output blocks checked; 0 illustration blocks",
+        )
         |> or_fail_with("The summary should give each count")
       }),
     ]),
@@ -373,9 +392,14 @@ pub fn tests() -> TestSuite {
         result
         |> should
         |> be_equal(
-          Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
-            Problem("README.md", 3, MissingGuideBadge),
-          ]),
+          Report(
+            ..check.empty_report(),
+            blocks_checked: 1,
+            diff_blocks_checked: 0,
+            problems: [
+              Problem("README.md", 3, MissingGuideBadge),
+            ],
+          ),
         )
         |> or_fail_with("The heading should need a guide badge")
       }),
@@ -389,9 +413,14 @@ pub fn tests() -> TestSuite {
         result
         |> should
         |> be_equal(
-          Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
-            Problem("src/app.gleam", 3, MissingBadgeHeading),
-          ]),
+          Report(
+            ..check.empty_report(),
+            blocks_checked: 1,
+            diff_blocks_checked: 0,
+            problems: [
+              Problem("src/app.gleam", 3, MissingBadgeHeading),
+            ],
+          ),
         )
         |> or_fail_with("The doc comment block should fail")
       }),
@@ -490,6 +519,83 @@ pub fn tests() -> TestSuite {
         |> should
         |> be_equal(Ok(LineRange(start: 3, end: 5)))
         |> or_fail_with("The range should be 3 to 5")
+      }),
+    ]),
+    group("doc_classify_fence.fence_kinds", [
+      it("gives the kind of each info string", fn() {
+        // Act
+        let result = doc_classify_fence.fence_kinds()
+
+        // Assert
+        result
+        |> should
+        |> be_equal([
+          check.GleamBlock,
+          check.CommandBlock("sh"),
+          check.OutputBlock,
+          check.IllustrationBlock("text"),
+          check.FileBlock("yaml"),
+          check.UnlabelledBlock,
+        ])
+        |> or_fail_with("Each info string should give its kind")
+      }),
+    ]),
+    group("doc_is_tested_file.tested_paths", [
+      it("accepts the tested files and the files under them", fn() {
+        // Act
+        let result = doc_is_tested_file.tested_paths()
+
+        // Assert
+        result
+        |> should
+        |> be_equal([True, True, False])
+        |> or_fail_with("Only the tested files should be accepted")
+      }),
+    ]),
+    group("doc_release_requirement.requirement", [
+      it("writes the range up to the next major version", fn() {
+        // Act
+        let result = doc_release_requirement.requirement()
+
+        // Assert
+        result
+        |> should
+        |> be_equal(">= 2.1.0-rc.1 and < 3.0.0")
+        |> or_fail_with("The requirement should end at the next major")
+      }),
+    ]),
+    group("doc_add_report.two_reports", [
+      it("adds the counts of both reports", fn() {
+        // Act
+        let result = doc_add_report.two_reports()
+
+        // Assert
+        result
+        |> should
+        |> be_equal(
+          check.Report(
+            blocks_checked: 2,
+            diff_blocks_checked: 0,
+            file_blocks_checked: 0,
+            command_blocks_checked: 0,
+            output_blocks_checked: 1,
+            illustration_blocks: 0,
+            problems: [],
+          ),
+        )
+        |> or_fail_with("The counts should be added")
+      }),
+    ]),
+    group("doc_empty_report.no_problems", [
+      it("counts no block", fn() {
+        // Act
+        let result = doc_empty_report.no_problems()
+
+        // Assert
+        result
+        |> should
+        |> be_equal(0)
+        |> or_fail_with("An empty report should count no block")
       }),
     ]),
     group("doc_is_guide_path.guide_paths", [
@@ -767,18 +873,23 @@ pub fn tests() -> TestSuite {
         report
         |> should
         |> be_equal(
-          Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
-            Problem(file, 1, MissingReleaseNotesSection("Key Highlights")),
-            Problem(file, 1, MissingReleaseNotesSection("What's New")),
-            Problem(file, 1, MissingReleaseNotesSection("Testing")),
-            Problem(
-              file,
-              1,
-              MissingReleaseNotesChoice(["Upgrading", "Installing"]),
-            ),
-            Problem(file, 1, MissingReleaseNotesSection("Documentation")),
-            Problem(file, 1, MissingReleaseNotesSection("Community")),
-          ]),
+          Report(
+            ..check.empty_report(),
+            blocks_checked: 1,
+            diff_blocks_checked: 0,
+            problems: [
+              Problem(file, 1, MissingReleaseNotesSection("Key Highlights")),
+              Problem(file, 1, MissingReleaseNotesSection("What's New")),
+              Problem(file, 1, MissingReleaseNotesSection("Testing")),
+              Problem(
+                file,
+                1,
+                MissingReleaseNotesChoice(["Upgrading", "Installing"]),
+              ),
+              Problem(file, 1, MissingReleaseNotesSection("Documentation")),
+              Problem(file, 1, MissingReleaseNotesSection("Community")),
+            ],
+          ),
         )
         |> or_fail_with("Only the template problems should be found")
       }),

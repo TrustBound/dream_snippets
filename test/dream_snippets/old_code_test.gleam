@@ -79,7 +79,12 @@ fn passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("The whole file at 2.4.1 should pass")
     }),
@@ -116,7 +121,12 @@ fn passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("Release notes can show code at an older release")
     }),

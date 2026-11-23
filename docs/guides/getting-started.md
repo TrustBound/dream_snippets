@@ -1,6 +1,6 @@
 # Getting started
 
-A code example in a README or a guide is the first code most people run from your package, and it's the code nobody tests. You rename a function, the tests pass, and the docs keep the old name until a reader finds out the hard way. dream_snippets closes that gap. Each Gleam code block in your docs must be an exact copy of a snippet file that your tests compile and run, and one command proves it. This guide takes a project from no checked docs to a check that runs in CI.
+A code example in a README or a guide is the first code most people run from your package, and it's the code nobody tests. You rename a function, the tests pass, and the docs keep the old name until a reader finds out the hard way. dream_snippets closes that gap. Each Gleam code block in your docs must be an exact copy of a snippet file that your tests compile and run, each other code block must be proven too, and one command checks it all. This guide takes a project from no checked docs to a check that runs in CI.
 
 ## Table of Contents
 
@@ -30,7 +30,9 @@ In this guide you'll:
 
 ## Before you start
 
-You need a Gleam project with a `repository` on GitHub in its `gleam.toml`. The check reads three fields there and needs nothing else:
+You need a Gleam project with a `repository` on GitHub in its `gleam.toml`. The check reads three fields there and needs nothing else. Here's the `gleam.toml` of the example project, which the tests of this guide use:
+
+### The gleam.toml of the example project <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/fixtures/my_app/gleam.toml"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```toml
 name = "my_app"
@@ -50,7 +52,9 @@ Run every command in this guide from the project root.
 
 ## Step 1: Run the check on your project
 
-Run the check before you change anything:
+Run the check before you change anything. This is the line that the check script of this package runs in CI:
+
+### Run the check <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/scripts/check.sh#L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```sh
 gleam run -m dream_snippets
@@ -58,11 +62,13 @@ gleam run -m dream_snippets
 
 In a new project with a README that has no code and one module in `src/`, it prints one line:
 
+### The summary of a project with no code blocks <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_getting_started_step_1.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
-0 blocks and 0 diff blocks checked in 2 files, 0 problems
+0 blocks and 0 diff blocks checked in 2 files, 0 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
-The check found two files to read: `README.md` and `src/my_app.gleam`. With no settings, it reads `README.md`, `SECURITY.md`, `docs/`, `examples/`, `CHANGELOG.md`, `releases/` and the doc comments in `src/`, and it skips each one that your project doesn't have. It never walks `build/`, `deps/`, `_build/` or `node_modules/`. It doesn't use the network either: it reads your files and, for some blocks, your local git history.
+The part before the `;` counts the `gleam` blocks, the `diff` blocks, the files and the problems. The part after it counts the blocks of the other kinds, which [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md#which-proof-to-use) explains. The check found two files to read: `README.md` and `src/my_app.gleam`. With no settings, it reads `README.md`, `SECURITY.md`, `docs/`, `examples/`, `CHANGELOG.md`, `releases/` and the doc comments in `src/`, and it skips each one that your project doesn't have. It never walks `build/`, `deps/`, `_build/` or `node_modules/`. It doesn't use the network either: it reads your files and, for some blocks, your local git history.
 
 If your docs already have code blocks, you'll see one line for each problem before the summary. That's fine. The steps below show how to make one block pass, and [Fix a failed check](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/fixing-check-failures.md) explains every message.
 
@@ -123,12 +129,12 @@ The block must be the same as the file, byte for byte. A whole-file block may le
 
 ## Step 4: Run the check again
 
-```sh
-gleam run -m dream_snippets
-```
+Run `gleam run -m dream_snippets` again:
+
+### The summary with one tested block <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_getting_started_step_4.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
-1 block and 0 diff blocks checked in 3 files, 0 problems
+1 block and 0 diff blocks checked in 3 files, 0 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 The check found the new guide, compared its one block with the snippet file, and found no problem. It stops with exit status 0, so a script or a CI step that runs it goes on.
@@ -137,9 +143,11 @@ The check found the new guide, compared its one block with the snippet file, and
 
 Now change the snippet the way a real change would: edit `"Hello, "` in `test/snippets/guide_getting_started_greeting.gleam` to `"Hi, "`, update the test, and leave the guide alone. The tests pass, because the test follows the code. The check doesn't:
 
+### The message of a changed snippet <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_getting_started_step_5_changed.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 docs/guides/getting-started.md:5: the code block is not the same as test/snippets/guide_getting_started_greeting.gleam; the first difference is at line 9
-1 block and 0 diff blocks checked in 3 files, 1 problem
+1 block and 0 diff blocks checked in 3 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 Each problem is one line in the form `file:line: reason`, sorted by file and line, and the summary comes last. The check stops with exit status 1, so the CI step fails. Read it from left to right:
@@ -152,18 +160,22 @@ The fix is always the same: copy the code from the snippet file into the block a
 
 A block with no badge fails too. If the heading above the block is only `### Greet a user`, the check prints:
 
+### The message of a block with no badge <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_getting_started_step_5_heading.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 docs/guides/getting-started.md:5: this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)
-1 block and 0 diff blocks checked in 3 files, 1 problem
+1 block and 0 diff blocks checked in 3 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 ## Step 6: Show the example in your README
 
 Most readers meet your package in the README, so put the example there too. A README example has one more rule: its heading has a second badge, the guide badge, which links to the guide section that explains the example. If you copy the heading from the guide as it is, the check prints:
 
+### The message of a README example with no guide badge <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_getting_started_step_6_no_guide_badge.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 README.md:5: this README example heading has no guide badge after its tested snippet badge; copy the heading from https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
-2 blocks and 0 diff blocks checked in 3 files, 1 problem
+2 blocks and 0 diff blocks checked in 3 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 The guide badge comes after the tested snippet badge, with one space between them:
@@ -174,35 +186,38 @@ The guide badge comes after the tested snippet badge, with one space between the
 
 The link names the guide file at the same tag, and `#greet-a-user-` is the anchor GitHub gives the guide heading `### Greet a user` with its badge. The badge leaves a space at the end of the heading text, and that space becomes the last hyphen. The check makes sure that the guide exists, that it has a heading with that anchor, and that it shows the same snippet file. With the guide badge in place:
 
+### The summary with the README example <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_getting_started_step_6.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
-2 blocks and 0 diff blocks checked in 3 files, 0 problems
+2 blocks and 0 diff blocks checked in 3 files, 0 problems; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
 [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md#step-4-add-an-example-to-the-readme) has the full rules for README examples and for anchors.
 
 ## Step 7: Run the check in CI
 
-The check is only worth something when it runs on every change. Add a step to your workflow after the tests:
+The check is only worth something when it runs on every change. Add two things to your workflow: a checkout with the tags, and a step after the tests that runs the check. This block is a template for your own workflow, so no file of this package holds it, and it's marked as an illustration:
 
-```yaml
+```yaml illustration
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
 - name: Check docs snippets
   run: gleam run -m dream_snippets
 ```
 
-If you use `make`, a target keeps the command short for local runs:
+The examples in this guide don't need git. A `diff` block, a block of code at an older release, and the release notes of an older release do, because the check reads your release tags. `actions/checkout` makes a shallow clone with no tags, so `fetch-depth: 0` asks for the full history.
+
+If you use `make`, a target keeps the command short for local runs. This is the target of this package's own Makefile:
+
+### The check-snippets target <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/Makefile#L22-L23"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```makefile
 check-snippets:
-	gleam run -m dream_snippets
+	@gleam run -m dream_snippets
 ```
 
-The examples in this guide don't need git. A `diff` block and a block of code at an older release do, because the check reads your release tags. `actions/checkout` makes a shallow clone with no tags, so when your docs have those blocks, check out with `fetch-depth: 0`:
-
-```yaml
-- uses: actions/checkout@v4
-  with:
-    fetch-depth: 0
-```
+When your docs show a command, such as this `gleam run` line, keep the command in a script that CI runs, and link the block to its line. [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md#step-6-show-a-command) shows how.
 
 ## Test your code
 
@@ -221,7 +236,7 @@ If you want the docs check to be part of `gleam test` itself, call it from a tes
 
 **Forgetting to bump the badges.** *Symptom:* after you change `version` in `gleam.toml`, every badge fails with `the badge link uses the tag 0.1.0, but this file must link at the tag 0.2.0`. *Fix:* replace the old tag in the badge links of your docs, for example with your editor's search and replace on `blob/0.1.0/`.
 
-**Gleam code in a `text` or `sh` fence.** *Symptom:* `this line looks like Gleam code in a text code fence`. *Fix:* Gleam code goes in a `gleam` fence with a badge, so the check can see it. Use `text` for output and `sh` for commands.
+**A block that nothing proves.** *Symptom:* `this text code block has no heading with the tested snippet badge directly above it`. *Fix:* every code block needs a proof. Output goes in an output file that a test compares, a command in a script that CI runs, and a config file in the file itself. [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md#which-proof-to-use) shows each form.
 
 **Two blank lines between the heading and the block.** *Symptom:* `this gleam code block has no heading with the tested snippet badge directly above it`, although the heading is there. *Fix:* at most one blank line may sit between the heading and the fence.
 

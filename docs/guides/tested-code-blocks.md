@@ -1,18 +1,22 @@
 # Tested code blocks
 
-The check wants each badge in one exact form, and a message sends you here when a heading doesn't match it. The four forms are right below, ready to copy. After them, this guide walks through the places a tested block can go: a guide, an excerpt of a longer file, a doc comment and the README. It also shows how to keep Gleam code out of the fences the check can't prove.
+The check wants each badge in one exact form, and a message sends you here when a heading doesn't match it. The four forms are right below, ready to copy. After them, this guide walks through the places a tested block can go: a guide, an excerpt of a longer file, a doc comment and the README. Then it shows the proof of every other kind of block: a config file, a command, output, packages to add, and an illustration that nothing proves. Every fenced code block in the checked docs has a proof, and none is skipped in silence.
 
 ## Table of Contents
 
 - [Copy a badge](#copy-a-badge)
 - [What you'll build](#what-youll-build)
 - [Before you start](#before-you-start)
-- [Which badge to use](#which-badge-to-use)
+- [Which proof to use](#which-proof-to-use)
 - [Step 1: Show a whole file](#step-1-show-a-whole-file)
 - [Step 2: Show part of a file with a line range](#step-2-show-part-of-a-file-with-a-line-range)
 - [Step 3: Show an example in a doc comment](#step-3-show-an-example-in-a-doc-comment)
 - [Step 4: Add an example to the README](#step-4-add-an-example-to-the-readme)
-- [Step 5: Keep Gleam code out of other fences](#step-5-keep-gleam-code-out-of-other-fences)
+- [Step 5: Show a file that the tests or CI use](#step-5-show-a-file-that-the-tests-or-ci-use)
+- [Step 6: Show a command](#step-6-show-a-command)
+- [Step 7: Show output](#step-7-show-output)
+- [Step 8: Show packages to add](#step-8-show-packages-to-add)
+- [Step 9: Keep Gleam code out of illustrations](#step-9-keep-gleam-code-out-of-illustrations)
 - [When the check fails](#when-the-check-fails)
 - [Test your code](#test-your-code)
 - [Common pitfalls](#common-pitfalls)
@@ -22,7 +26,7 @@ The check wants each badge in one exact form, and a message sends you here when 
 
 Replace `<owner>`, `<repo>`, `<version>`, `<path>` and the heading text. Keep everything else exactly as it is. `<owner>` and `<repo>` are the `user` and `repo` of `repository` in `gleam.toml`, and `<version>` is its `version`. In release notes and in a `## [<version>]` changelog section, `<version>` is the release of the notes or the section instead, so the notes of `0.1.0` keep linking at `0.1.0` after the next version bump. Each badge goes at the end of the heading, after one space.
 
-**The tested snippet badge**, for a ```` ```gleam ```` block. `<path>` is the snippet file from the project root. Add `#L<start>-L<end>` to show only those lines:
+**The tested snippet badge**, for a ```` ```gleam ```` block, and for a file, command or output block. `<path>` is the snippet file, or the file that the block copies, from the project root. Add `#L<start>-L<end>` to show only those lines:
 
 ```markdown
 ### Encode a user <a href="https://github.com/<owner>/<repo>/blob/<version>/<path>"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
@@ -55,7 +59,9 @@ In this guide you'll:
 - Show a whole snippet file, and an excerpt of one with a line range.
 - Put a tested example in a doc comment, and check it.
 - Add an example to the README with a guide badge, and work out the anchor it links to.
-- Show command output and example documents without tripping the check.
+- Show a config file, a command and output, each a copy of a file that the tests or CI use.
+- Show `gleam add` lines and dependency lines, which need no file.
+- Mark a folder tree as an illustration, and keep Gleam code out of it.
 
 ## Before you start
 
@@ -67,15 +73,23 @@ gleam add --dev dream_snippets
 
 The examples below use the project `me/my_app` at version `0.1.0`. Run the check from the project root with `gleam run -m dream_snippets`.
 
-## Which badge to use
+## Which proof to use
 
-| Your situation | Use | Why |
+The language of the fence, the first word after the backticks, sets the kind of the block. Each kind has one proof:
+
+| The block | Its kind | The proof |
 |:---|:---|:---|
-| Gleam code that works with the current version | The tested snippet badge | The block is a copy of a snippet file that your tests run. |
-| The same example in the root README | The tested snippet badge, then the guide badge | The README links each example to the guide section that explains it. |
-| A change between two releases, in an upgrade guide | The tested diff badge | Old code doesn't compile any more. The block is a part of the real `git diff` instead. |
-| Old code next to the new code, in a guide or in release notes | The code at an older release badge | The block is a copy of a file at an older release tag, read from git. |
-| Command output, shell commands, TOML, YAML | No badge, in a `text`, `sh`, `toml` or `yaml` fence | The check doesn't prove these. It only makes sure that they hold no Gleam code. |
+| Gleam code that works with the current version, in a `gleam` fence | Gleam block | The tested snippet badge: a copy of a snippet file that your tests run. In the root README, the guide badge too. |
+| A change between two releases, in a `diff` fence | Diff block | The tested diff badge: a part of the real `git diff`. |
+| Old code next to the new code, in a guide or in release notes | Gleam block | The code at an older release badge: a copy of a file at an older release tag, read from git. |
+| A config file, a Dockerfile, SQL, YAML, any other language | File block | The tested snippet badge: a copy of a file that the tests or CI use. A `toml` block of only dependency lines of your package needs no badge ([Step 8](#step-8-show-packages-to-add)). |
+| A command, in a `bash`, `sh`, `shell` or `console` fence | Command block | The tested snippet badge: a copy of a script that CI or a test runs. A block of only `gleam add` and `gleam deps update` lines needs no badge ([Step 8](#step-8-show-packages-to-add)). |
+| What a program prints or returns, in a `text` fence | Output block | The tested snippet badge: a copy of an output file that a test compares with the real output. |
+| An example document, in a `markdown` or `md` fence | Example document | The fences inside it are checked like any other fence ([Step 9](#step-9-keep-gleam-code-out-of-illustrations)). |
+| A folder tree, a diagram, a placeholder form | Illustration | Nothing proves it. Write `illustration` after the language, as in ```` ```text illustration ````. The summary counts it, and it must not hold Gleam code. |
+| A fence with no language | None | Always a problem. Name the language. |
+
+The check can't see whether a test or CI uses a file. So the project lists the files and directories that they use in the `tested_files` setting, and a file, command or output block can link only to a file in that list or under it. The default is `["test", ".github"]`. [Settings and checks reference](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/reference.md#settings) has the details.
 
 ## Step 1: Show a whole file
 
@@ -198,20 +212,107 @@ pub fn guide_anchors(guide: String) -> List(String) {
 
 For a guide with the headings `# Greeting users`, `## What's New`, ``### The `greeting` function``, `### Greet a user` with one badge, `### Greet a user` with two badges, and `## Usage` two times, it returns:
 
+### The anchors of the example guide <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_tested_code_blocks_anchors.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 ["greeting-users", "whats-new", "the-greeting-function", "greet-a-user-", "greet-a-user--", "usage", "usage-1"]
 ```
 
 Leave out the last hyphen and the check names the anchor it couldn't find:
 
+### The message of an anchor without the last hyphen <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_tested_code_blocks_anchor_missing.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
 ```text
 README.md:3: the guide badge links to the anchor #greet-a-user, but docs/guides/getting-started.md has no heading with that anchor
-2 blocks and 0 diff blocks checked in 3 files, 1 problem
+2 blocks and 0 diff blocks checked in 3 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks
 ```
 
-## Step 5: Keep Gleam code out of other fences
+## Step 5: Show a file that the tests or CI use
 
-A block the check can't see can't be proven, so Gleam code must not hide in a fence with another language or none. A line in a `text`, `sh` or unlabelled fence counts as Gleam when it has one of these forms, which no other common language of the docs has:
+A block of a config file, a Dockerfile, SQL or YAML is a file block. It's a copy of a real file that the tests or CI use, such as the Dockerfile that CI builds, a migration that the tests apply, or the `gleam.toml` of a tested example project. It takes the same heading and badge as a Gleam snippet, and the same line ranges. Here's the `gleam.toml` of the example project of the guides, which the tests of the guides read:
+
+### The gleam.toml of the example project <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/fixtures/my_app/gleam.toml"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```toml
+name = "my_app"
+version = "0.1.0"
+repository = { type = "github", user = "me", repo = "my_app" }
+```
+
+The check compares the block with the file byte for byte, as it does for a Gleam block. The file must be one of the `tested_files` paths of the project, or under one of them. The default `["test", ".github"]` holds the files of the tests and the workflows of CI. This package also lists the scripts that CI runs, its `Makefile` and its own `gleam.toml`, which every build reads:
+
+### The settings of this package <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/gleam.toml#L31-L33"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```toml
+[tools.dream_snippets]
+markdown = ["README.md", "SECURITY.md", "CONTRIBUTING.md", "docs"]
+tested_files = ["test", ".github", "scripts", "Makefile", "gleam.toml"]
+```
+
+## Step 6: Show a command
+
+A `bash`, `sh`, `shell` or `console` block is a command block. Put the command in a script that CI or a test runs, and link the block to its line. This package keeps the commands that CI runs in `scripts/check.sh`, so the command that runs the check is line 10 of that script:
+
+### Run the check <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/scripts/check.sh#L10"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```sh
+gleam run -m dream_snippets
+```
+
+When the script changes, the block no longer matches, and the check tells you. A command that no script runs, such as a command that a reader runs one time in their own project, can be an illustration.
+
+## Step 7: Show output
+
+A `text` block is an output block: what a program prints or returns. Put the output in a file, such as `test/outputs/<name>.txt`, and have a test compare the file with the real output. Then link the block to the file. The anchors of [Step 4](#work-out-the-anchor) are in `test/outputs/guide_tested_code_blocks_anchors.txt`, and this helper compares them with the real anchors:
+
+### Compare the real output with the output file <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/guide_tested_code_blocks_output.gleam#L10-L18"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+
+```gleam
+/// Tells whether the output file holds the anchors of the guide, as
+/// `string.inspect` writes them, with a line break at the end.
+pub fn anchors_match_output_file(guide: String) -> Bool {
+  let real =
+    string.inspect(guide_tested_code_blocks_anchor.guide_anchors(guide))
+  let shown =
+    simplifile.read("test/outputs/guide_tested_code_blocks_anchors.txt")
+  shown == Ok(real <> "\n")
+}
+```
+
+The test of this guide asserts that it returns `True` for the example guide, and `False` for another one. So the output block can't drift: a change of `heading_anchors` fails the test, and a change of the file fails the check. The output blocks of all the guides of this package work this way, and their tests compare the output of the check with a file in `test/outputs/`.
+
+## Step 8: Show packages to add
+
+Two kinds of block need no file, because the check can prove them with `gleam.toml`.
+
+A command block whose lines are each `gleam add` or `gleam deps update` (blank lines are allowed) needs no badge. Each argument is a package name, or `--dev` on a `gleam add` line. Each package is the `name` of your project, or a key of `[dependencies]` or `[dev-dependencies]` in its `gleam.toml`. So a reader adds a package that exists and that your project uses:
+
+```sh
+gleam add --dev dream_snippets
+```
+
+A `toml` block whose lines are each `[dependencies]`, `[dev-dependencies]` or `<package> = "<requirement>"` needs no badge either, when its first line is one of the two tables. It names only the package of your project, and the requirement is `>= <release> and < <next major>.0.0`, the one that `gleam add` writes for the release of the document. In the release notes of `1.0.0`, and in a guide while `gleam.toml` says `1.0.0`, that's:
+
+```toml
+[dev-dependencies]
+dream_snippets = ">= 1.0.0 and < 2.0.0"
+```
+
+After the next version bump, a guide must show the new release, and the check tells you. The release notes of `1.0.0` keep `1.0.0`. This proves the upgrade and install blocks of the [release notes template](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/release-notes-template.md) with no file. A block with another line, another package or a version in a `gleam add` line needs a file instead.
+
+## Step 9: Keep Gleam code out of illustrations
+
+Some blocks have nothing to be a copy of: a folder tree, a diagram, a placeholder form. Mark such a block as an illustration: write the word `illustration` after the language, with one space:
+
+```text illustration
+my_app/
+  docs/guides/getting-started.md
+  test/outputs/getting_started.txt
+```
+
+GitHub and HexDocs read only the first word of the info string, so the block shows as a `text` block. The mark stays in the Markdown source, where `grep -rn 'illustration$'` finds every one. The summary line counts the illustrations, so a reviewer sees how many there are. Use them for what can't be proven, not to skip a proof. A `gleam`, `diff` or `markdown` block is never an illustration.
+
+An illustration must not hold Gleam code, because nothing would prove it. A line counts as Gleam when it has one of these forms, which no other common language of the docs has:
 
 - `import a/b` (a module path with a `/`) or `import a.{...}`
 - `fn name(` or `pub fn name(`
@@ -220,16 +321,22 @@ A block the check can't see can't be proven, so Gleam code must not hide in a fe
 - `let assert ...`
 - a pipe into a module function, such as `|> list.map(`
 
-A `text` fence in `docs/guides/usage.md` that holds `import my_app/greeting` on line 4 fails:
+An illustration in `docs/guides/usage.md` that holds `import my_app/greeting` on line 4 fails:
+
+### The message of Gleam code in an illustration <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/outputs/guide_tested_code_blocks_hidden_gleam.txt"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```text
-docs/guides/usage.md:4: this line looks like Gleam code in a text code fence; put Gleam code in a gleam block with the tested snippet badge
-0 blocks and 0 diff blocks checked in 2 files, 1 problem
+docs/guides/usage.md:4: this line looks like Gleam code in a text illustration code fence; put Gleam code in a gleam block with the tested snippet badge
+0 blocks and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 1 illustration block
 ```
 
-Output, shell commands and config files are fine in their own fences. A `diff` fence is its own kind of block, with its own badge.
+A ```` ```markdown ```` fence holds an example document, like the headings in this guide. The check looks inside it:
 
-A ```` ```markdown ```` fence holds an example document, like the headings in this guide. The check looks inside it: its fences are checked like the fences of any other document, and its other lines must not look like Gleam code. So an example document can show headings and badges freely, but a ```` ```gleam ```` block inside it needs a real badge to a real snippet, the same as anywhere else. Show headings in the `markdown` fence and the code in its own tested block, as this guide does.
+- Each fence in it is checked like a fence of any other document, with the same kinds and proofs. A ```` ```gleam ```` block in it needs a real badge to a real snippet, and a `text` block needs an output file.
+- Each other line must not look like Gleam code.
+- Its headings, links and other prose are not checked, and neither are its badges unless a fence sits under them. An example document of release notes is not checked against the release notes template.
+
+That's sound, because prose proves nothing and claims nothing that a reader runs: every line that a reader could run is in a fence, and every fence is proven. So an example document can show headings and badges freely. Show the headings in the `markdown` fence and the code in its own tested block, as this guide does.
 
 ## When the check fails
 
@@ -242,6 +349,9 @@ Each problem is one line, `file:line: reason`. For a code block and its badge, t
 | `the badge link uses the tag 0.1.0, but this file must link at the tag 0.2.0` | The version in `gleam.toml` changed | Change the tag in every badge link of the guides, the README and the doc comments. Release notes and changelog sections keep their own release. |
 | `the code block is not the same as ...; the first difference is at line 9` | The snippet changed, or the block was edited | Copy the file or the line range into the block again |
 | `the line range ends at line 20, but the file has 16 lines` | The snippet got shorter | Fix the numbers in the link |
+| `this text code block has no heading with the tested snippet badge` | An output block with no proof | Put the output in a file that a test compares, and link to it ([Step 7](#step-7-show-output)) |
+| `which is not under a tested_files path` | A file, command or output block links to a file that the project doesn't list as used | Link to a file that the tests or CI use, and list it in `tested_files` |
+| `this code fence has no language` | A fence with no language | Name the language, or mark the block as an illustration |
 
 [Fix a failed check](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/fixing-check-failures.md) has every message, with what it means and the fix.
 
@@ -249,7 +359,7 @@ Each problem is one line, `file:line: reason`. For a code block and its badge, t
 
 The check proves that the docs show the snippet. Your tests prove that the snippet works. Give each snippet a test that runs it and asserts the exact value its docs show. The tests of this guide do that: `has_anchor(guide, "greet-a-user-")` returns `True` and `has_anchor(guide, "greet-a-user")` returns `False` for the example guide, and `greet_lucy()` returns `"Hello, Lucy!"`.
 
-To check a doc comment from a test, without a whole project, call `check.check_gleam_source` with a `CheckContext`. [Use it from Gleam](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/use-from-gleam.md) shows how to build one. For the doc comment of [Step 3](#step-3-show-an-example-in-a-doc-comment), it returns `Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [])`.
+To check a doc comment from a test, without a whole project, call `check.check_gleam_source` with a `CheckContext`. [Use it from Gleam](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/use-from-gleam.md) shows how to build one. For the doc comment of [Step 3](#step-3-show-an-example-in-a-doc-comment), it returns `Report(..check.empty_report(), blocks_checked: 1, problems: [])`.
 
 ## Common pitfalls
 

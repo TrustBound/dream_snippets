@@ -3,7 +3,7 @@
 //// `build/fixtures/`, checks it as the command does, and asserts the exact
 //// output that the guide shows.
 
-import dream_snippets.{type Output, Output}
+import dream_snippets.{type Output}
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/suite.{type TestSuite}
 import dream_test/unit.{describe, it}
@@ -69,14 +69,11 @@ pub fn tests() -> TestSuite {
       let output = check("step_1", [#("README.md", readme)])
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        standard_output: [
-          "0 blocks and 0 diff blocks checked in 2 files, 0 problems",
-        ],
-        standard_error: [],
-        exit_status: 0,
+      |> be_equal(#(
+        guide_project.output_file("guide_getting_started_step_1"),
+        0,
       ))
       |> or_fail_with("The first run should count the files and pass")
     }),
@@ -122,14 +119,11 @@ pub fn tests() -> TestSuite {
         ])
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        standard_output: [
-          "1 block and 0 diff blocks checked in 3 files, 0 problems",
-        ],
-        standard_error: [],
-        exit_status: 0,
+      |> be_equal(#(
+        guide_project.output_file("guide_getting_started_step_4"),
+        0,
       ))
       |> or_fail_with("The guide should pass")
     }),
@@ -147,15 +141,11 @@ pub fn tests() -> TestSuite {
         ])
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        standard_output: [
-          "docs/guides/getting-started.md:5: the code block is not the same as test/snippets/guide_getting_started_greeting.gleam; the first difference is at line 9",
-          "1 block and 0 diff blocks checked in 3 files, 1 problem",
-        ],
-        standard_error: [],
-        exit_status: 1,
+      |> be_equal(#(
+        guide_project.output_file("guide_getting_started_step_5_changed"),
+        1,
       ))
       |> or_fail_with("The old block should fail")
     }),
@@ -168,15 +158,11 @@ pub fn tests() -> TestSuite {
         ])
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        standard_output: [
-          "docs/guides/getting-started.md:5: this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)",
-          "1 block and 0 diff blocks checked in 3 files, 1 problem",
-        ],
-        standard_error: [],
-        exit_status: 1,
+      |> be_equal(#(
+        guide_project.output_file("guide_getting_started_step_5_heading"),
+        1,
       ))
       |> or_fail_with("The block with no badge should fail")
     }),
@@ -189,15 +175,11 @@ pub fn tests() -> TestSuite {
         ])
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        standard_output: [
-          "README.md:5: this README example heading has no guide badge after its tested snippet badge; copy the heading from https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html",
-          "2 blocks and 0 diff blocks checked in 3 files, 1 problem",
-        ],
-        standard_error: [],
-        exit_status: 1,
+      |> be_equal(#(
+        guide_project.output_file("guide_getting_started_step_6_no_guide_badge"),
+        1,
       ))
       |> or_fail_with("The README example needs the guide badge")
     }),
@@ -210,14 +192,11 @@ pub fn tests() -> TestSuite {
         ])
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        standard_output: [
-          "2 blocks and 0 diff blocks checked in 3 files, 0 problems",
-        ],
-        standard_error: [],
-        exit_status: 0,
+      |> be_equal(#(
+        guide_project.output_file("guide_getting_started_step_6"),
+        0,
       ))
       |> or_fail_with("The README example should pass")
     }),

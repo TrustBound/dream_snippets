@@ -1,3 +1,4 @@
+import dream_snippets/block_kinds_test
 import dream_snippets/check_test
 import dream_snippets/config_test
 import dream_snippets/git_test
@@ -22,6 +23,7 @@ import snippets_test
 
 pub fn main() {
   runner.new([
+    block_kinds_test.tests(),
     check_test.tests(),
     config_test.tests(),
     git_test.tests(),

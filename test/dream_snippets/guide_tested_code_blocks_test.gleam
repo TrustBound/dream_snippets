@@ -3,7 +3,6 @@
 //// guide, or checks the example project of the guide, and asserts the
 //// exact value or output that the guide shows.
 
-import dream_snippets.{Output}
 import dream_snippets/check.{CheckContext, Report, Version}
 import dream_snippets/config
 import dream_snippets/git
@@ -14,6 +13,7 @@ import fixtures/guide_project.{guide_badge_end, snippet_badge_end}
 import simplifile
 import snippets/guide_tested_code_blocks_anchor
 import snippets/guide_tested_code_blocks_greet_lucy
+import snippets/guide_tested_code_blocks_output
 
 const snippet_path = "test/snippets/guide_getting_started_greeting.gleam"
 
@@ -114,7 +114,7 @@ pub fn tests() -> TestSuite {
         guide_project.read(
           "test/snippets/guide_tested_code_blocks_doc_comment.gleam",
         )
-      let assert Ok(configuration) = config.parse(guide_project.gleam_toml)
+      let assert Ok(configuration) = config.parse(guide_project.gleam_toml())
       let context =
         CheckContext(
           project: configuration.project,
@@ -135,7 +135,12 @@ pub fn tests() -> TestSuite {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("The doc comment example should pass")
     }),
@@ -149,22 +154,18 @@ pub fn tests() -> TestSuite {
         ])
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        standard_output: [
-          "README.md:3: the guide badge links to the anchor #greet-a-user, but docs/guides/getting-started.md has no heading with that anchor",
-          "2 blocks and 0 diff blocks checked in 3 files, 1 problem",
-        ],
-        standard_error: [],
-        exit_status: 1,
+      |> be_equal(#(
+        guide_project.output_file("guide_tested_code_blocks_anchor_missing"),
+        1,
       ))
       |> or_fail_with("The anchor should be checked against the guide")
     }),
-    it("step 5: Gleam code in a text fence fails", fn() {
+    it("step 9: Gleam code in an illustration fails", fn() {
       // Arrange
       let text_guide =
-        "# Usage\n\n```text\nimport my_app/greeting\n```\n\n````markdown\n### Greet a user <a href=\"x\"><img></a>\n````\n"
+        "# Usage\n\n```text illustration\nimport my_app/greeting\n```\n\n````markdown\n### Greet a user <a href=\"x\"><img></a>\n````\n"
 
       // Act
       let output =
@@ -173,17 +174,59 @@ pub fn tests() -> TestSuite {
         ])
 
       // Assert
-      output
+      #(guide_project.printed(output), output.exit_status)
       |> should
-      |> be_equal(Output(
-        standard_output: [
-          "docs/guides/usage.md:4: this line looks like Gleam code in a text code fence; put Gleam code in a gleam block with the tested snippet badge",
-          "0 blocks and 0 diff blocks checked in 2 files, 1 problem",
-        ],
-        standard_error: [],
-        exit_status: 1,
+      |> be_equal(#(
+        guide_project.output_file("guide_tested_code_blocks_hidden_gleam"),
+        1,
       ))
-      |> or_fail_with("The import should be found in the text fence")
+      |> or_fail_with("The import should be found in the illustration")
+    }),
+    it("step 7: the anchors match the output file", fn() {
+      // Act
+      let matches =
+        guide_tested_code_blocks_output.anchors_match_output_file(anchor_guide)
+
+      // Assert
+      matches
+      |> should
+      |> be_equal(True)
+      |> or_fail_with("The output file should hold the real anchors")
+    }),
+    it("step 7: other anchors do not match the output file", fn() {
+      // Act
+      let matches =
+        guide_tested_code_blocks_output.anchors_match_output_file("# Other\n")
+
+      // Assert
+      matches
+      |> should
+      |> be_equal(False)
+      |> or_fail_with("The comparison should fail for other output")
+    }),
+    it("step 8: package lines of the example project pass", fn() {
+      // Arrange
+      let guide =
+        "# Install\n\n```sh\ngleam add --dev dream_snippets\n```\n\n```toml\n[dev-dependencies]\nmy_app = \">= 0.1.0 and < 1.0.0\"\n```\n"
+      let gleam_toml =
+        guide_project.gleam_toml()
+        <> "\n[dev-dependencies]\ndream_snippets = \">= 0.1.0 and < 1.0.0\"\n"
+
+      // Act
+      let output =
+        guide_project.check("tested_code_blocks_packages", [
+          #("gleam.toml", gleam_toml),
+          #("docs/guides/install.md", guide),
+        ])
+
+      // Assert
+      #(guide_project.printed(output), output.exit_status)
+      |> should
+      |> be_equal(#(
+        "0 blocks and 0 diff blocks checked in 2 files, 0 problems; 1 file block, 1 command block and 0 output blocks checked; 0 illustration blocks\n",
+        0,
+      ))
+      |> or_fail_with("The package lines should pass with no badge")
     }),
   ])
 }

@@ -53,7 +53,12 @@ fn readme_passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("The example should pass")
     }),
@@ -72,7 +77,12 @@ fn readme_passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 1, diff_blocks_checked: 0, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 1,
+          diff_blocks_checked: 0,
+          problems: [],
+        ),
       )
       |> or_fail_with("The anchor should be decoded before it is compared")
     }),
@@ -91,7 +101,12 @@ fn readme_passing_tests() -> UnitNode {
       report
       |> should
       |> be_equal(
-        Report(blocks_checked: 0, diff_blocks_checked: 1, problems: []),
+        Report(
+          ..check.empty_report(),
+          blocks_checked: 0,
+          diff_blocks_checked: 1,
+          problems: [],
+        ),
       )
       |> or_fail_with("A diff block heading takes no guide badge")
     }),

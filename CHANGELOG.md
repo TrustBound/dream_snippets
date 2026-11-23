@@ -16,8 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `gleam.toml`, and the release tag from its `version`.
 - An optional `[tools.dream_snippets]` table in `gleam.toml` sets the
   checked places (`markdown`, `changelog`, `release_notes`,
-  `gleam_source`), `checked_from_version`, `guides`, `badge_guide` and
-  `release_notes_guide`.
+  `gleam_source`), `checked_from_version`, `guides`, `tested_files`,
+  `badge_guide` and `release_notes_guide`.
 - By default every changelog section and every release note is checked
   (`checked_from_version = "0.0.0"`). A project sets
   `checked_from_version` to start the check at a later version.
@@ -80,16 +80,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Each problem and each error is exactly one line. A control character in
   a file name, a value or a message shows as `\n`, `\r`, `\t` or
   `\u{<hex>}`. `check.one_line` does it for every message.
-- The summary line uses the singular for a count of 1, as in
-  `1 block and 0 diff blocks checked in 1 file, 1 problem`.
+- Every fenced code block in the checked docs has a proof, in the way that
+  fits its kind, and none is skipped in silence. `check.classify_fence`
+  reads the kind of each fence from its info string, and every check uses
+  it, so a language that the check does not know is a file block that
+  needs a proof.
+  - A file block (any language that is not `gleam`, `diff`, `markdown`,
+    a command or `text`, such as `yaml`, `toml`, `sql` or `dockerfile`),
+    a command block (`bash`, `sh`, `shell`, `console`) and an output block
+    (`text`) have a heading with the tested snippet badge, as a Gleam
+    snippet does. The block is the linked file or line range, byte for
+    byte, at the release of the document.
+  - The new `tested_files` setting lists the files and directories that
+    the tests or CI use. The default is `["test", ".github"]`. A file,
+    command or output block links only to a file in that list or under it.
+  - A command block of only `gleam add` and `gleam deps update` lines
+    needs no badge: each package is the `name` of the project or a key of
+    `[dependencies]` or `[dev-dependencies]` in `gleam.toml`, and the only
+    other argument is `--dev` on a `gleam add` line.
+  - A `toml` block of only `[dependencies]` and `[dev-dependencies]` lines
+    needs no badge: it names the package of the project, with the
+    requirement `>= <release> and < <next major>.0.0` of the release of the
+    document. So the upgrade and install blocks of release notes are
+    proven with no file. `check.release_requirement` gives the requirement.
+  - A block whose info string is a language and the word `illustration`,
+    such as `text illustration`, is an illustration. Nothing proves it, it
+    must not hold Gleam code, and the summary line counts it. A `gleam`,
+    `diff` or `markdown` block is never an illustration.
+  - A fence with no language is always a problem.
+  - The fences inside a `markdown` example document are checked by the
+    same kinds and proofs.
+- The summary line counts each kind:
+  `<n> blocks and <n> diff blocks checked in <n> files, <n> problems; <n> file blocks, <n> command blocks and <n> output blocks checked; <n> illustration blocks`.
+  It uses the singular for a count of 1, as in
+  `1 block and 0 diff blocks checked in 1 file, 1 problem; 0 file blocks, 1 command block and 0 output blocks checked; 0 illustration blocks`.
+  `check.summary` takes a `Report` and the number of files.
+  `check.Report` has the new counts, and `check.empty_report` and
+  `check.add_report` build reports.
 - The docs of this package are seven pages under `docs/guides`, and
   HexDocs shows each one as a page. The README lists them. Six are guides
   that each walk through one task from start to finish: "Getting
   started", "Tested code blocks", "Fix a failed check", "Show an API
   change in an upgrade guide", "Release notes template" and "Use it from
   Gleam". "Settings and checks reference" lists every setting with its
-  default and every check. Each output that a guide shows is asserted by
-  a test.
-- Every public function has a tested example in its doc comment: 47
+  default and every check. Each output that a guide shows is an output
+  file under `test/outputs/` that a test compares with the real output.
+- Every public function has a tested example in its doc comment: 52
   functions, each with a snippet file under `test/snippets/`. Each public
   function is named in a guide where a reader needs it.

@@ -1,0 +1,1 @@
+Ok(["::error file=docs/guides/usage.md,line=5::this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)"])

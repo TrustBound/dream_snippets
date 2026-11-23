@@ -30,3 +30,4 @@ dream_test = { git = "https://github.com/TrustBound/dream_test.git", ref = "1639
 
 [tools.dream_snippets]
 markdown = ["README.md", "SECURITY.md", "CONTRIBUTING.md", "docs"]
+tested_files = ["test", ".github", "scripts", "Makefile", "gleam.toml"]
