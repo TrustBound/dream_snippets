@@ -36,6 +36,10 @@ import simplifile
 /// docs belong to other projects.
 const skipped_directory_names = ["build", "deps", "_build", "node_modules"]
 
+/// The path of the root README, relative to the project root. Its example
+/// headings carry the guide badge.
+const readme_path = "README.md"
+
 /// An error that stops the check before it can report.
 pub type CheckError {
   /// `gleam.toml` cannot be used.
@@ -216,11 +220,41 @@ fn check_file(
   let #(path, kind) = file
   use text <- result.map(read_document(directory, path))
   case kind {
-    check.MarkdownDocument | check.ReleaseNotes ->
-      check.check_markdown(path, text, context)
+    check.MarkdownDocument -> check_markdown_file(path, text, context)
+    check.ReleaseNotes -> check_release_notes(path, text, context)
     check.Changelog -> check.check_changelog(path, text, context)
     check.GleamSource -> check.check_gleam_source(path, text, context)
   }
+}
+
+/// Checks a Markdown document. The root README also has the guide badge
+/// rules (see `check.check_readme`).
+fn check_markdown_file(
+  path: String,
+  text: String,
+  context: check.CheckContext,
+) -> Report {
+  case path == readme_path {
+    True -> check.check_readme(path, text, context)
+    False -> check.check_markdown(path, text, context)
+  }
+}
+
+/// Checks the code blocks of release notes, and that they follow the
+/// release notes template.
+fn check_release_notes(
+  path: String,
+  text: String,
+  context: check.CheckContext,
+) -> Report {
+  let report = check.check_markdown(path, text, context)
+  Report(
+    ..report,
+    problems: list.append(
+      report.problems,
+      check.check_release_notes_template(path, text),
+    ),
+  )
 }
 
 fn empty_report() -> Report {

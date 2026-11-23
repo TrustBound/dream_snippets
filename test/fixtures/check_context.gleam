@@ -54,6 +54,20 @@ pub const badge_end =
 pub const diff_badge_end =
   "\"><img align=\"right\" alt=\"Tested diff\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-diff-lightgreen.svg?style=flat-square\"></a>"
 
+pub const guide_badge_end =
+  "\"><img align=\"right\" alt=\"Guide\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>"
+
+/// A guide that shows the example of `snippet_path`. Its anchors are
+/// `example-guide`, `example` and `café-au-lait`.
+pub const guide_path = "docs/guides/example.md"
+
+/// A guide that does not show the example. Its anchors are `other-guide`
+/// and `setup`.
+pub const other_guide_path = "docs/guides/other.md"
+
+/// A guide that cannot be read.
+pub const unreadable_guide_path = "docs/guides/locked.md"
+
 /// The file with a diff in the fake history: it changed between the tag
 /// 2.4.1 and the working tree.
 pub const diff_path = "src/app.gleam"
@@ -93,6 +107,8 @@ pub fn project() -> Project {
     version: "3.0.0",
     repository: GitHubRepository(owner: "TrustBound", name: "dream"),
     badge_guide: "docs/contributing/contributing.md",
+    release_notes_guide: "docs/contributing/release-notes.md",
+    guides: ["docs/guides"],
   )
 }
 
@@ -113,8 +129,10 @@ fn read_fake_source(path: String) -> Result(String, simplifile.FileError) {
     #(snippet_path, snippet_source),
     #(plain_snippet_path, plain_snippet_source),
     #(tight_snippet_path, tight_snippet_source),
+    #(guide_path, guide_source()),
+    #(other_guide_path, "# Other guide\n\n## Setup\n"),
   ]
-  case path == unreadable_path {
+  case path == unreadable_path || path == unreadable_guide_path {
     True -> Error(simplifile.Eacces)
     False ->
       list.key_find(files, path) |> result.replace_error(simplifile.Enoent)
@@ -135,6 +153,43 @@ pub fn heading(target: String) -> String {
   "### Example <a href=\"https://github.com/TrustBound/dream/blob/3.0.0/"
   <> target
   <> badge_end
+}
+
+fn guide_source() -> String {
+  document([
+    "# Example guide",
+    "",
+    heading(snippet_path <> "#L7-L9"),
+    "",
+    "```gleam",
+    "pub fn main() {",
+    "  io.println(\"hi\")",
+    "}",
+    "```",
+    "",
+    "## Café au lait",
+  ])
+}
+
+/// A README example heading: the tested snippet badge that links to
+/// `snippet_target`, then the guide badge that links to `guide_target`
+/// (a path and an anchor), both at the tag 3.0.0.
+pub fn readme_heading(snippet_target: String, guide_target: String) -> String {
+  heading(snippet_target)
+  <> " <a href=\"https://github.com/TrustBound/dream/blob/3.0.0/"
+  <> guide_target
+  <> guide_badge_end
+}
+
+/// A README with one example under `heading_line`. The heading is line 1
+/// and the fence line 3.
+pub fn readme_document(heading_line: String) -> List(String) {
+  list.flatten([[heading_line, "", "```gleam"], main_function(), ["```"]])
+}
+
+/// Checks the lines as the root README with the fake context.
+pub fn check_readme(lines: List(String)) -> Report {
+  check.check_readme("README.md", document(lines), context())
 }
 
 /// A heading with a diff badge that links to the compare view `range`, at

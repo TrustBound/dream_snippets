@@ -40,6 +40,11 @@
 //// and contiguous within one hunk. The new tag is the version in
 //// `gleam.toml`, because that tag does not exist before the release.
 ////
+//// In the root README, the heading of each ```` ```gleam ```` block also
+//// has the guide badge after the tested snippet badge. It links to the
+//// section of a guide that shows the example (see `check_readme`). In
+//// every other document, a heading has no guide badge.
+////
 //// Release notes and changelog entries are checked from the
 //// `checked_from_version` of the `CheckContext` on. Older ones show code
 //// that was right for their own version, so they are not.
@@ -56,6 +61,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/order.{type Order}
 import gleam/result
 import gleam/string
+import gleam/uri
 import simplifile
 
 // ---------------------------------------------------------------------------
@@ -90,13 +96,19 @@ pub type Version {
 /// is the release tag that every badge link must use. `repository` is the
 /// GitHub repository that every badge must link at. `badge_guide` is the
 /// document or address that a malformed badge message tells the reader to
-/// copy the badge from.
+/// copy the badge from. `release_notes_guide` is the document or address
+/// that a release notes template message tells the reader to read.
+/// `guides` are the directories that hold the guides of the project, such
+/// as `docs/guides`: the guide badge of a README example must link to a
+/// `.md` file under one of them.
 pub type Project {
   Project(
     name: String,
     version: String,
     repository: GitHubRepository,
     badge_guide: String,
+    release_notes_guide: String,
+    guides: List(String),
   )
 }
 
@@ -122,6 +134,26 @@ const badge_end =
 /// heading.
 const diff_badge_end =
   "\"><img align=\"right\" alt=\"Tested diff\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-diff-lightgreen.svg?style=flat-square\"></a>"
+
+/// The alt text of the guide badge image. The guide badge form is in
+/// `guide_badge_alt`, `guide_badge_image` and `guide_badge_end` only.
+const guide_badge_alt = "Guide"
+
+/// The image address of the guide badge.
+const guide_badge_image =
+  "https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"
+
+/// The exact text after the link address of a guide badge, to the end of
+/// the heading. The guide badge comes after the tested snippet badge.
+const guide_badge_end =
+  "\"><img align=\"right\" alt=\""
+  <> guide_badge_alt
+  <> "\" src=\""
+  <> guide_badge_image
+  <> "\"></a>"
+
+/// The text that shows that a heading has a guide badge, in any form.
+const guide_badge_marker = " alt=\"" <> guide_badge_alt <> "\""
 
 /// The start of the anchor that names one file in a compare view. The
 /// SHA-256 hex digest of the file's path follows it.
@@ -221,6 +253,62 @@ pub type Reason {
   HunkHeaderNotFound(header: String)
   /// A line of the block is not in the real diff at that place.
   DiffLineNotFound(path: String, old_tag: String)
+  /// The first line of release notes is not `# <Name> <version> Release
+  /// Notes`. `found` is the first line, and `version` is the version in the
+  /// file name (or `<version>` when the name has none).
+  ReleaseNotesTitleMismatch(found: String, version: String)
+  /// Release notes have no line that starts with `**Release Date:**`
+  /// between the title and the first `##` section.
+  MissingReleaseDate
+  /// A `##` section of release notes is not a section of the template.
+  UnknownReleaseNotesSection(section: String)
+  /// A `##` section of release notes comes after `after`, but the template
+  /// has it before `after`.
+  ReleaseNotesSectionOutOfOrder(section: String, after: String)
+  /// A `##` section of release notes is in the file again. `first_line` is
+  /// the line where it is first.
+  RepeatedReleaseNotesSection(section: String, first_line: Int)
+  /// Release notes have two `##` sections that the template has as a
+  /// choice of one, such as `Upgrading` and `Installing`. `other` is the
+  /// one that comes first.
+  ConflictingReleaseNotesSections(section: String, other: String)
+  /// Release notes do not have a `##` section that the template requires.
+  MissingReleaseNotesSection(section: String)
+  /// Release notes have none of the `##` sections of a required choice,
+  /// such as `Upgrading` or `Installing`.
+  MissingReleaseNotesChoice(sections: List(String))
+  /// A `##` section of release notes does not have a `###` heading that
+  /// the template requires in it.
+  MissingReleaseNotesSubsection(section: String, subsection: String)
+  /// An example heading in the README has no guide badge after its tested
+  /// snippet badge.
+  MissingGuideBadge
+  /// An example heading in the README has a guide badge, but not in the
+  /// exact form, or not directly after the tested snippet badge.
+  MalformedGuideBadge
+  /// A heading outside the README has a guide badge. Only README examples
+  /// have one.
+  GuideBadgeNotAllowed
+  /// The guide badge links to another repository or host, or out of the
+  /// repository.
+  ForeignGuideLink(url: String)
+  /// The tag in the guide badge link is not the release tag of the
+  /// document (see `CheckContext`).
+  WrongGuideTag(found: String, expected: String)
+  /// The guide badge links to a path that is not a `.md` file under one of
+  /// the guide directories. `guides` are those directories.
+  NotAGuidePath(path: String, guides: List(String))
+  /// The guide badge link has no `#<anchor>` for the section of the
+  /// example.
+  MissingGuideAnchor(path: String)
+  /// The guide file of the guide badge does not exist in this repository.
+  MissingGuideFile(path: String)
+  /// The guide file has no heading whose anchor is `anchor` (without its
+  /// `#`). See `heading_anchors`.
+  GuideAnchorNotFound(path: String, anchor: String)
+  /// The guide file has no tested snippet badge that links to `snippet`,
+  /// so it does not show the example.
+  ExampleNotInGuide(path: String, snippet: String)
 }
 
 /// One problem: the file, the 1-based line, and why.
@@ -272,6 +360,34 @@ pub type SnippetLink {
   SnippetLink(tag: String, path: String, anchor: String)
 }
 
+/// The badges of an example heading, read by `parse_example_heading`.
+///
+/// `snippet_address` is the link address of the tested snippet badge, and
+/// `guide_badge` is what the heading has of the guide badge.
+pub type ExampleHeading {
+  ExampleHeading(snippet_address: String, guide_badge: GuideBadgeFound)
+}
+
+/// What an example heading has of the guide badge.
+pub type GuideBadgeFound {
+  /// The heading has no guide badge.
+  NoGuideBadge
+  /// The heading ends with the guide badge in the exact form, directly
+  /// after the tested snippet badge. `address` is its link address.
+  GuideBadgeLink(address: String)
+  /// The heading has a guide badge, but not in the exact form, or not
+  /// directly after the tested snippet badge.
+  BrokenGuideBadge
+}
+
+/// A link to a section of a guide, read from a guide badge.
+///
+/// `anchor` is the fragment after the `#`, or an empty string when the
+/// link has none.
+pub type GuideLink {
+  GuideLink(tag: String, path: String, anchor: String)
+}
+
 /// The part of a file that a badge link names.
 pub type LineSelection {
   /// The link has no line anchor: the block is the whole file.
@@ -306,6 +422,15 @@ type ScanPlace {
   InsideExample
 }
 
+/// Whether the example headings of a document carry the guide badge.
+type GuideBadgeRule {
+  /// The root README: each `gleam` block heading must end with the guide
+  /// badge.
+  GuideBadgeRequired
+  /// Every other document: no heading may have the guide badge.
+  GuideBadgeForbidden
+}
+
 /// The kind of a line in a Gleam source file.
 type CommentKind {
   ItemComment
@@ -333,10 +458,18 @@ pub fn is_checked_release_notes(
 /// Reads the version from the name of a release notes file, for example
 /// `Version(3, 0, 0)` from `releases/release-3.0.0.md`.
 pub fn release_notes_version(path: String) -> Result(Version, Nil) {
+  use version_text <- result.try(release_notes_version_text(path))
+  parse_release_version(version_text)
+}
+
+/// The version in the name of a release notes file, as it is written
+/// there, for example `3.0.0-rc.1` from `releases/release-3.0.0-rc.1.md`.
+fn release_notes_version_text(path: String) -> Result(String, Nil) {
   let file_name = path |> string.split("/") |> list.last |> result.unwrap(path)
   use rest <- result.try(remove_prefix(file_name, "release-"))
   use version_text <- result.try(remove_suffix(rest, ".md"))
-  parse_release_version(version_text)
+  use _version <- result.map(parse_release_version(version_text))
+  version_text
 }
 
 /// Reads `major.minor.patch`. A pre-release part after a `-`, such as
@@ -390,7 +523,7 @@ pub fn check_changelog(
     marked_lines
     |> list.filter(fn(marked) { marked.0 })
     |> list.map(fn(marked) { marked.1 })
-  scan(lines, [], TopLevel, file, context, empty_report())
+  scan(lines, [], TopLevel, GuideBadgeForbidden, file, context, empty_report())
 }
 
 /// Whether a line is in a checked section: a section heading decides it
@@ -439,6 +572,369 @@ fn remove_suffix(text: String, suffix: String) -> Result(String, Nil) {
     True -> Ok(string.drop_end(text, string.length(suffix)))
     False -> Error(Nil)
   }
+}
+
+// ---------------------------------------------------------------------------
+// The release notes template
+// ---------------------------------------------------------------------------
+
+/// Whether the release notes template requires a section.
+pub type SectionPresence {
+  /// The file must have the section. For a choice of headings, it must
+  /// have one of them.
+  RequiredSection
+  /// The file may leave the section out.
+  OptionalSection
+}
+
+/// A `##` heading that the release notes template allows.
+///
+/// `name` is the text of the heading after `## `. `subsections` are the
+/// `###` headings that the section must have when the file has it.
+pub type SectionHeading {
+  SectionHeading(name: String, subsections: List(String))
+}
+
+/// One place in the order of the release notes template. `choices` are
+/// the headings that can fill the place, and a file has one of them at
+/// most. With `RequiredSection`, a file has exactly one of them.
+pub type TemplateSection {
+  TemplateSection(choices: List(SectionHeading), presence: SectionPresence)
+}
+
+/// The text after the version in the title of release notes. The title is
+/// `# <Name> <version> Release Notes`.
+pub const release_notes_title_end = " Release Notes"
+
+/// The start of the line that gives the release date of release notes.
+pub const release_date_prefix = "**Release Date:**"
+
+/// The `##` sections of the release notes template, in order. This is the
+/// only place that holds the template. `check_release_notes_template`
+/// reads it, and the "Release notes template" guide of this package shows
+/// it.
+///
+/// `Upgrading` is for a release that replaces an earlier one, and must
+/// have a `### Migration Guide`. `Installing` is for a first release.
+pub const release_notes_template = [
+  TemplateSection([SectionHeading("Key Highlights", [])], RequiredSection),
+  TemplateSection([SectionHeading("What's New", [])], RequiredSection),
+  TemplateSection([SectionHeading("Deprecated", [])], OptionalSection),
+  TemplateSection([SectionHeading("Removed", [])], OptionalSection),
+  TemplateSection([SectionHeading("Bug Fixes", [])], OptionalSection),
+  TemplateSection([SectionHeading("Known Limits", [])], OptionalSection),
+  TemplateSection([SectionHeading("Testing", [])], RequiredSection),
+  TemplateSection(
+    [
+      SectionHeading("Upgrading", ["Migration Guide"]),
+      SectionHeading("Installing", []),
+    ],
+    RequiredSection,
+  ),
+  TemplateSection([SectionHeading("Acknowledgements", [])], OptionalSection),
+  TemplateSection([SectionHeading("Documentation", [])], RequiredSection),
+  TemplateSection([SectionHeading("Community", [])], RequiredSection),
+]
+
+/// A heading of release notes: its line number and its text, without the
+/// `#` marks and without trailing HTML such as a badge link.
+type HeadingLine {
+  HeadingLine(line: Int, name: String)
+}
+
+/// A `##` section of release notes that is in the template. `place` is its
+/// index in `release_notes_template`.
+type FoundSection {
+  FoundSection(place: Int, name: String, line: Int)
+}
+
+/// The state of the walk over the `##` headings of release notes.
+/// `found` holds the first section found for each place, nearest first.
+/// `latest` is the section with the highest place so far.
+type TemplateScan {
+  TemplateScan(
+    found: List(FoundSection),
+    latest: Option(FoundSection),
+    problems: List(Problem),
+  )
+}
+
+/// Checks that release notes follow the release notes template.
+///
+/// Headings are read outside code fences only, and trailing HTML after a
+/// heading, such as a badge link, is ignored. The rules are:
+///
+/// - The first line is `# <Name> <version> Release Notes`, where
+///   `<version>` is the version in the file name and `<Name>` is any text.
+/// - A line that starts with `**Release Date:**` comes after the title and
+///   before the first `##` section.
+/// - The `##` sections are only those of `release_notes_template`, each
+///   one time at most, in its order, and each required one is there.
+/// - Each section has the `###` headings that the template requires in it.
+///
+/// ## Parameters
+///
+/// - `file`: the path of the release notes, for example
+///   `releases/release-3.0.0.md`. The title must use its version.
+/// - `text`: the content of the release notes
+///
+/// ## Returns
+///
+/// Each problem, sorted by line, with the line where it is, or line 1 for
+/// a missing title, release date or section. A missing `###` heading is at the line of its
+/// `##` section. An empty list when the release notes follow the template.
+pub fn check_release_notes_template(
+  file: String,
+  text: String,
+) -> List(Problem) {
+  let lines = numbered_lines(text, 1)
+  let prose = prose_lines(lines, [])
+  let headings = list.filter_map(prose, heading_at(_, "## "))
+  let first_section_line =
+    headings
+    |> list.first
+    |> result.map(fn(heading) { heading.line })
+    |> result.unwrap(list.length(lines) + 1)
+  let walk =
+    list.fold(headings, TemplateScan([], None, []), fn(walk, heading) {
+      add_section_heading(file, walk, heading)
+    })
+  list.flatten([
+    title_problems(file, lines),
+    release_date_problems(file, prose, first_section_line),
+    list.reverse(walk.problems),
+    missing_section_problems(file, walk.found),
+    list.flat_map(list.reverse(walk.found), fn(section) {
+      subsection_problems(file, prose, section)
+    }),
+  ])
+  |> sort_problems
+}
+
+/// The lines of a document that are not in a code fence. A fence with no
+/// closing fence runs to the end of the document.
+fn prose_lines(remaining: List(Line), kept: List(Line)) -> List(Line) {
+  case remaining {
+    [] -> list.reverse(kept)
+    [line, ..rest] -> prose_line(line, rest, kept)
+  }
+}
+
+fn prose_line(line: Line, rest: List(Line), kept: List(Line)) -> List(Line) {
+  case parse_fence_opener(line.text) {
+    None -> prose_lines(rest, [line, ..kept])
+    Some(opener) -> {
+      let #(_content, _closing, after) = split_fence(opener, rest, [])
+      prose_lines(after, kept)
+    }
+  }
+}
+
+/// Reads a heading that starts with `marker`, such as `## `.
+fn heading_at(line: Line, marker: String) -> Result(HeadingLine, Nil) {
+  use rest <- result.map(remove_prefix(line.text, marker))
+  let name = case string.split_once(rest, " <") {
+    Ok(#(name, _html)) -> name
+    Error(Nil) -> rest
+  }
+  HeadingLine(line: line.number, name: string.trim(name))
+}
+
+fn title_problems(file: String, lines: List(Line)) -> List(Problem) {
+  let title =
+    lines
+    |> list.first
+    |> result.map(fn(line) { line.text })
+    |> result.unwrap("")
+  let version = result.unwrap(release_notes_version_text(file), "<version>")
+  case is_release_notes_title(title, version) {
+    True -> []
+    False -> [
+      Problem(file:, line: 1, reason: ReleaseNotesTitleMismatch(title, version)),
+    ]
+  }
+}
+
+fn is_release_notes_title(title: String, version: String) -> Bool {
+  title
+  |> remove_prefix("# ")
+  |> result.try(remove_suffix(_, " " <> version <> release_notes_title_end))
+  |> result.map(fn(name) { string.trim(name) != "" })
+  |> result.unwrap(False)
+}
+
+fn release_date_problems(
+  file: String,
+  prose: List(Line),
+  first_section_line: Int,
+) -> List(Problem) {
+  let has_release_date =
+    list.any(prose, fn(line) {
+      line.number > 1
+      && line.number < first_section_line
+      && string.starts_with(line.text, release_date_prefix)
+    })
+  case has_release_date {
+    True -> []
+    False -> [Problem(file:, line: 1, reason: MissingReleaseDate)]
+  }
+}
+
+fn indexed_template() -> List(#(Int, TemplateSection)) {
+  list.index_map(release_notes_template, fn(section, index) {
+    #(index, section)
+  })
+}
+
+fn template_place(name: String) -> Result(Int, Nil) {
+  indexed_template()
+  |> list.find(fn(entry) {
+    list.any({ entry.1 }.choices, fn(choice) { choice.name == name })
+  })
+  |> result.map(fn(entry) { entry.0 })
+}
+
+fn add_section_heading(
+  file: String,
+  walk: TemplateScan,
+  heading: HeadingLine,
+) -> TemplateScan {
+  case template_place(heading.name) {
+    Error(Nil) ->
+      add_template_problem(
+        walk,
+        Problem(
+          file:,
+          line: heading.line,
+          reason: UnknownReleaseNotesSection(heading.name),
+        ),
+      )
+    Ok(place) ->
+      add_known_section(
+        file,
+        walk,
+        FoundSection(place:, name: heading.name, line: heading.line),
+      )
+  }
+}
+
+fn add_template_problem(walk: TemplateScan, problem: Problem) -> TemplateScan {
+  TemplateScan(..walk, problems: [problem, ..walk.problems])
+}
+
+fn add_known_section(
+  file: String,
+  walk: TemplateScan,
+  section: FoundSection,
+) -> TemplateScan {
+  case list.find(walk.found, fn(earlier) { earlier.place == section.place }) {
+    Ok(earlier) ->
+      add_template_problem(
+        walk,
+        Problem(
+          file:,
+          line: section.line,
+          reason: second_section_reason(earlier, section),
+        ),
+      )
+    Error(Nil) -> add_new_section(file, walk, section)
+  }
+}
+
+fn second_section_reason(
+  earlier: FoundSection,
+  section: FoundSection,
+) -> Reason {
+  case earlier.name == section.name {
+    True ->
+      RepeatedReleaseNotesSection(
+        section: section.name,
+        first_line: earlier.line,
+      )
+    False ->
+      ConflictingReleaseNotesSections(
+        section: section.name,
+        other: earlier.name,
+      )
+  }
+}
+
+fn add_new_section(
+  file: String,
+  walk: TemplateScan,
+  section: FoundSection,
+) -> TemplateScan {
+  let found = [section, ..walk.found]
+  case walk.latest {
+    Some(latest) if latest.place > section.place ->
+      TemplateScan(..walk, found:)
+      |> add_template_problem(Problem(
+        file:,
+        line: section.line,
+        reason: ReleaseNotesSectionOutOfOrder(
+          section: section.name,
+          after: latest.name,
+        ),
+      ))
+    _ -> TemplateScan(..walk, found:, latest: Some(section))
+  }
+}
+
+fn missing_section_problems(
+  file: String,
+  found: List(FoundSection),
+) -> List(Problem) {
+  indexed_template()
+  |> list.filter(fn(entry) {
+    { entry.1 }.presence == RequiredSection
+    && !list.any(found, fn(section) { section.place == entry.0 })
+  })
+  |> list.map(fn(entry) {
+    Problem(file:, line: 1, reason: missing_section_reason(entry.1))
+  })
+}
+
+fn missing_section_reason(section: TemplateSection) -> Reason {
+  case section.choices {
+    [only] -> MissingReleaseNotesSection(only.name)
+    choices ->
+      MissingReleaseNotesChoice(list.map(choices, fn(choice) { choice.name }))
+  }
+}
+
+/// The `###` headings that the template requires in a section, and that
+/// the section does not have. The section runs to the next `##` heading.
+fn subsection_problems(
+  file: String,
+  prose: List(Line),
+  section: FoundSection,
+) -> List(Problem) {
+  let present =
+    prose
+    |> list.drop_while(fn(line) { line.number <= section.line })
+    |> list.take_while(fn(line) { result.is_error(heading_at(line, "## ")) })
+    |> list.filter_map(heading_at(_, "### "))
+    |> list.map(fn(heading) { heading.name })
+  required_subsections(section.name)
+  |> list.filter(fn(name) { !list.contains(present, name) })
+  |> list.map(fn(name) {
+    Problem(
+      file:,
+      line: section.line,
+      reason: MissingReleaseNotesSubsection(
+        section: section.name,
+        subsection: name,
+      ),
+    )
+  })
+}
+
+fn required_subsections(name: String) -> List(String) {
+  release_notes_template
+  |> list.flat_map(fn(section) { section.choices })
+  |> list.find(fn(choice) { choice.name == name })
+  |> result.map(fn(choice) { choice.subsections })
+  |> result.unwrap([])
 }
 
 // ---------------------------------------------------------------------------
@@ -591,7 +1087,112 @@ pub fn describe_reason(reason: Reason, project: Project) -> String {
       <> " -- "
       <> path
       <> "\" at this place; a diff block shows lines of the real diff, in order and contiguous within a hunk"
+    ReleaseNotesTitleMismatch(found:, version:) ->
+      "the first line is \""
+      <> found
+      <> "\", but the template wants the title \"# <Name> "
+      <> version
+      <> release_notes_title_end
+      <> "\""
+      <> template_pointer(project)
+    MissingReleaseDate ->
+      "there is no line that starts with \""
+      <> release_date_prefix
+      <> "\" between the title and the first section, but the template wants one there"
+      <> template_pointer(project)
+    UnknownReleaseNotesSection(section:) ->
+      quoted_section(section)
+      <> " is not a section of the release notes template"
+      <> template_pointer(project)
+    ReleaseNotesSectionOutOfOrder(section:, after:) ->
+      quoted_section(section)
+      <> " comes after "
+      <> quoted_section(after)
+      <> ", but the template has it before "
+      <> quoted_section(after)
+      <> template_pointer(project)
+    RepeatedReleaseNotesSection(section:, first_line:) ->
+      quoted_section(section)
+      <> " is in the file again (first at line "
+      <> int.to_string(first_line)
+      <> "), but the template has each section one time at most"
+      <> template_pointer(project)
+    ConflictingReleaseNotesSections(section:, other:) ->
+      quoted_section(other)
+      <> " and "
+      <> quoted_section(section)
+      <> " are both in the file, but the template allows only one of them"
+      <> template_pointer(project)
+    MissingReleaseNotesSection(section:) ->
+      "the section "
+      <> quoted_section(section)
+      <> " is missing, but the template requires it"
+      <> template_pointer(project)
+    MissingReleaseNotesChoice(sections:) ->
+      "neither "
+      <> sections |> list.map(quoted_section) |> string.join(" nor ")
+      <> " is in the file, but the template requires one of them"
+      <> template_pointer(project)
+    MissingReleaseNotesSubsection(section:, subsection:) ->
+      quoted_section(section)
+      <> " has no \"### "
+      <> subsection
+      <> "\", but the template requires it in that section"
+      <> template_pointer(project)
+    MissingGuideBadge ->
+      "this README example heading has no guide badge after its tested snippet badge; copy the heading from "
+      <> project.badge_guide
+    MalformedGuideBadge ->
+      "the guide badge is not in the exact format, or it is not directly after the tested snippet badge; copy the heading from "
+      <> project.badge_guide
+    GuideBadgeNotAllowed ->
+      "this heading has a guide badge, but only README example headings have one; here the heading has only the tested snippet badge"
+    ForeignGuideLink(url:) ->
+      "the guide badge link "
+      <> url
+      <> " does not point at a file in "
+      <> repository_url(project.repository)
+    WrongGuideTag(found:, expected:) ->
+      "the guide badge link uses the tag "
+      <> found
+      <> ", but this file must link at the tag "
+      <> expected
+      <> tag_rule(project)
+    NotAGuidePath(path:, guides:) ->
+      "the guide badge links to "
+      <> path
+      <> ", but it must link to a .md file under "
+      <> string.join(guides, " or ")
+    MissingGuideAnchor(path:) ->
+      "the guide badge link to "
+      <> path
+      <> " has no #<anchor>, but it must name the guide section of this example"
+    MissingGuideFile(path:) ->
+      "the guide badge links to "
+      <> path
+      <> ", which is not a file in this repository"
+    GuideAnchorNotFound(path:, anchor:) ->
+      "the guide badge links to the anchor #"
+      <> anchor
+      <> ", but "
+      <> path
+      <> " has no heading with that anchor"
+    ExampleNotInGuide(path:, snippet:) ->
+      path
+      <> " has no tested snippet badge that links to "
+      <> snippet
+      <> ", but the guide of a README example must show that example"
   }
+}
+
+/// The end of each release notes template message: where the template is
+/// written.
+fn template_pointer(project: Project) -> String {
+  "; see \"Release notes template\" in " <> project.release_notes_guide
+}
+
+fn quoted_section(section: String) -> String {
+  "\"## " <> section <> "\""
 }
 
 fn describe_fence_language(language: String) -> String {
@@ -636,7 +1237,7 @@ fn problems_report(problems: List(Problem)) -> Report {
 ///
 /// ## Examples
 ///
-/// ### Check one document <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/readme_check_markdown.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+/// ### Check one document <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/guide_check_markdown.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ///
 /// ```gleam
 /// import dream_snippets/check.{
@@ -652,6 +1253,8 @@ fn problems_report(problems: List(Problem)) -> Report {
 ///       version: "1.2.0",
 ///       repository: GitHubRepository(owner: "me", name: "my_app"),
 ///       badge_guide: "CONTRIBUTING.md",
+///       release_notes_guide: "CONTRIBUTING.md",
+///       guides: ["docs/guides"],
 ///     )
 ///   let context =
 ///     CheckContext(
@@ -669,7 +1272,50 @@ pub fn check_markdown(
   text: String,
   context: CheckContext,
 ) -> Report {
-  scan(numbered_lines(text, 1), [], TopLevel, file, context, empty_report())
+  scan(
+    numbered_lines(text, 1),
+    [],
+    TopLevel,
+    GuideBadgeForbidden,
+    file,
+    context,
+    empty_report(),
+  )
+}
+
+/// Checks the root README of a project: every fenced code block, as
+/// `check_markdown` does, and the guide badge of each example.
+///
+/// In the README, the heading of each `gleam` block has two badges: the
+/// tested snippet badge, then one space and the guide badge. Both images
+/// float right, so the guide badge shows to the left of the tested snippet
+/// badge:
+///
+/// ```markdown
+/// ### Title <a href="https://github.com/<owner>/<repo>/blob/<version>/<snippet path>"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/<owner>/<repo>/blob/<version>/docs/guides/<name>.md#<anchor>"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
+/// ```
+///
+/// The guide badge links to a `.md` file under one of the `guides`
+/// directories of the project, at the release tag, with the anchor of a
+/// heading of that guide (see `heading_anchors`). The guide must have a
+/// tested snippet badge that links to the same snippet file, so it shows
+/// the example. The guide badge is checked when the tested snippet badge
+/// is a link of the repository. Its problems are at the line of the
+/// heading. A `diff` block heading has no guide badge.
+pub fn check_readme(
+  file: String,
+  text: String,
+  context: CheckContext,
+) -> Report {
+  scan(
+    numbered_lines(text, 1),
+    [],
+    TopLevel,
+    GuideBadgeRequired,
+    file,
+    context,
+    empty_report(),
+  )
 }
 
 /// Checks every fenced code block in the `///` and `////` doc comments of
@@ -689,7 +1335,9 @@ pub fn check_gleam_source(
   |> list.map(classify_comment_line)
   |> list.chunk(by: fn(classified) { classified.0 })
   |> list.filter_map(comment_run)
-  |> list.map(fn(run) { scan(run, [], TopLevel, file, context, empty_report()) })
+  |> list.map(fn(run) {
+    scan(run, [], TopLevel, GuideBadgeForbidden, file, context, empty_report())
+  })
   |> merge_reports
 }
 
@@ -747,13 +1395,15 @@ fn scan(
   remaining: List(Line),
   above: List(Line),
   place: ScanPlace,
+  rule: GuideBadgeRule,
   file: String,
   context: CheckContext,
   report: Report,
 ) -> Report {
   case remaining {
     [] -> report
-    [line, ..rest] -> scan_line(line, rest, above, place, file, context, report)
+    [line, ..rest] ->
+      scan_line(line, rest, above, place, rule, file, context, report)
   }
 }
 
@@ -762,6 +1412,7 @@ fn scan_line(
   rest: List(Line),
   above: List(Line),
   place: ScanPlace,
+  rule: GuideBadgeRule,
   file: String,
   context: CheckContext,
   report: Report,
@@ -769,7 +1420,7 @@ fn scan_line(
   case parse_fence_opener(line.text) {
     None -> {
       let report = add_report(report, check_prose_line(line, place, file))
-      scan(rest, [line, ..above], place, file, context, report)
+      scan(rest, [line, ..above], place, rule, file, context, report)
     }
     Some(opener) -> {
       let #(raw_content, closing, after) = split_fence(opener, rest, [])
@@ -787,7 +1438,10 @@ fn scan_line(
           closed: option.is_some(closing),
         )
       let report =
-        add_report(report, check_block(block, above, after, file, context))
+        add_report(
+          report,
+          check_block(block, above, after, rule, file, context),
+        )
       let above =
         list.flatten([
           option_to_list(closing),
@@ -795,7 +1449,7 @@ fn scan_line(
           [line],
           above,
         ])
-      scan(after, above, place, file, context, report)
+      scan(after, above, place, rule, file, context, report)
     }
   }
 }
@@ -912,6 +1566,7 @@ fn check_block(
   block: FencedBlock,
   above: List(Line),
   after: List(Line),
+  rule: GuideBadgeRule,
   file: String,
   context: CheckContext,
 ) -> Report {
@@ -924,7 +1579,7 @@ fn check_block(
       Report(
         blocks_checked: 1,
         diff_blocks_checked: 0,
-        problems: check_gleam_block(block, above, after, file, context),
+        problems: check_gleam_block(block, above, after, rule, file, context),
       )
     "diff" ->
       Report(
@@ -933,7 +1588,15 @@ fn check_block(
         problems: check_diff_block(block, above, file, context),
       )
     "markdown" | "md" ->
-      scan(block.content, [], InsideExample, file, context, empty_report())
+      scan(
+        block.content,
+        [],
+        InsideExample,
+        rule,
+        file,
+        context,
+        empty_report(),
+      )
     language -> problems_report(hidden_gleam(block, language, file))
   }
   add_report(problems_report(unclosed), report)
@@ -956,6 +1619,7 @@ fn check_gleam_block(
   block: FencedBlock,
   above: List(Line),
   after: List(Line),
+  rule: GuideBadgeRule,
   file: String,
   context: CheckContext,
 ) -> List(Problem) {
@@ -966,7 +1630,7 @@ fn check_gleam_block(
     old_tested_source_line(first_line_skipping_one_blank(after), file)
   let heading_problems = case first_line_skipping_one_blank(above) {
     None -> [at_block(MissingBadgeHeading)]
-    Some(line) -> check_heading(line, block, file, context)
+    Some(line) -> check_heading(line, block, rule, file, context)
   }
   list.append(heading_problems, old_line_below)
 }
@@ -1008,30 +1672,43 @@ fn old_tested_source_line(line: Option(Line), file: String) -> List(Problem) {
 fn check_heading(
   heading: Line,
   block: FencedBlock,
+  rule: GuideBadgeRule,
   file: String,
   context: CheckContext,
 ) -> List(Problem) {
   case is_old_tested_source_line(heading.text) {
     True -> [Problem(file:, line: heading.number, reason: OldTestedSourceLine)]
-    False ->
-      heading_reasons(heading.text, block, context)
-      |> list.map(fn(reason) {
-        Problem(file:, line: block.opening_line, reason:)
-      })
+    False -> example_heading_problems(heading, block, rule, file, context)
   }
 }
 
-fn heading_reasons(
-  text: String,
+/// The problems of the badges of an example heading. The problems of the
+/// tested snippet badge are at the line of the block, and those of the
+/// guide badge at the line of the heading.
+fn example_heading_problems(
+  heading: Line,
   block: FencedBlock,
+  rule: GuideBadgeRule,
+  file: String,
   context: CheckContext,
-) -> List(Reason) {
-  let link =
-    parse_badge_heading(text)
-    |> result.try(parse_snippet_link(_, context.project.repository))
-  case link {
-    Ok(link) -> check_link(link, block, context)
-    Error(reason) -> [reason]
+) -> List(Problem) {
+  let at_line = fn(line) { fn(reason) { Problem(file:, line:, reason:) } }
+  let parsed =
+    parse_example_heading(heading.text)
+    |> result.try(fn(example) {
+      parse_snippet_link(example.snippet_address, context.project.repository)
+      |> result.map(fn(link) { #(example, link) })
+    })
+  case parsed {
+    Error(reason) -> [at_line(block.opening_line)(reason)]
+    Ok(#(example, link)) ->
+      list.append(
+        list.map(check_link(link, block, context), at_line(block.opening_line)),
+        list.map(
+          guide_badge_reasons(example.guide_badge, link, rule, context),
+          at_line(heading.number),
+        ),
+      )
   }
 }
 
@@ -1049,6 +1726,83 @@ pub fn parse_badge_heading(text: String) -> Result(String, Reason) {
 /// `diff_badge_end` in place of `badge_end`.
 pub fn parse_diff_badge_heading(text: String) -> Result(String, Reason) {
   parse_heading_with_badge(text, DiffBadge)
+}
+
+/// Reads the heading of a `gleam` block: the tested snippet badge, and the
+/// guide badge after it, if any.
+///
+/// When the last badge of the heading is a guide badge, the text before it
+/// must be a heading that ends with the tested snippet badge (see
+/// `parse_badge_heading`). The guide badge is `badge_start`, the address,
+/// and exactly `guide_badge_end`. When the last badge is not a guide badge,
+/// the whole heading must end with the tested snippet badge, and a guide
+/// badge in another place is a `BrokenGuideBadge`.
+///
+/// ## Errors
+///
+/// The `Reason` of `parse_badge_heading` when the tested snippet badge is
+/// missing or not in the exact format.
+pub fn parse_example_heading(text: String) -> Result(ExampleHeading, Reason) {
+  let trimmed = string.trim(text)
+  let parts = string.split(trimmed, badge_start)
+  let last = list.last(parts) |> result.unwrap("")
+  let before_last =
+    parts
+    |> list.take(list.length(parts) - 1)
+    |> string.join(badge_start)
+  case string.contains(last, guide_badge_marker) {
+    True -> example_heading(before_last, guide_badge_from(last))
+    False -> example_heading(trimmed, guide_badge_elsewhere(trimmed))
+  }
+}
+
+fn example_heading(
+  snippet_heading: String,
+  guide_badge: GuideBadgeFound,
+) -> Result(ExampleHeading, Reason) {
+  use snippet_address <- result.map(parse_badge_heading(snippet_heading))
+  ExampleHeading(snippet_address:, guide_badge:)
+}
+
+/// Reads the last badge of a heading, which has the guide badge alt text.
+fn guide_badge_from(badge: String) -> GuideBadgeFound {
+  let address = remove_suffix(badge, guide_badge_end) |> result.unwrap("")
+  case address == "" || string.contains(address, "\"") {
+    True -> BrokenGuideBadge
+    False -> GuideBadgeLink(address)
+  }
+}
+
+fn guide_badge_elsewhere(heading: String) -> GuideBadgeFound {
+  case string.contains(heading, guide_badge_marker) {
+    True -> BrokenGuideBadge
+    False -> NoGuideBadge
+  }
+}
+
+/// Reads a guide badge link address into a guide link. The address must be
+/// a file in `repository` on GitHub, as
+/// `https://github.com/<owner>/<name>/blob/<tag>/<path>#<anchor>`, with a
+/// path that stays inside the repository (the rule of
+/// `parse_snippet_link`).
+///
+/// ## Errors
+///
+/// `ForeignGuideLink(address)` when the address names another repository
+/// or host, or a path out of the repository.
+pub fn parse_guide_link(
+  address: String,
+  repository: GitHubRepository,
+) -> Result(GuideLink, Reason) {
+  parse_snippet_link(address, repository)
+  |> result.map(fn(link) {
+    GuideLink(
+      tag: link.tag,
+      path: link.path,
+      anchor: string.drop_start(link.anchor, 1),
+    )
+  })
+  |> result.replace_error(ForeignGuideLink(address))
 }
 
 fn parse_heading_with_badge(
@@ -1352,6 +2106,294 @@ fn document_line(block: FencedBlock, index: Int) -> Int {
     [line, ..] -> line.number
     [] -> block.closing_line
   }
+}
+
+// ---------------------------------------------------------------------------
+// The guide badge
+// ---------------------------------------------------------------------------
+
+/// The problems of the guide badge of one example heading. `snippet` is
+/// the link of the tested snippet badge of the same heading.
+fn guide_badge_reasons(
+  guide_badge: GuideBadgeFound,
+  snippet: SnippetLink,
+  rule: GuideBadgeRule,
+  context: CheckContext,
+) -> List(Reason) {
+  case rule, guide_badge {
+    GuideBadgeForbidden, NoGuideBadge -> []
+    GuideBadgeForbidden, _ -> [GuideBadgeNotAllowed]
+    GuideBadgeRequired, NoGuideBadge -> [MissingGuideBadge]
+    GuideBadgeRequired, BrokenGuideBadge -> [MalformedGuideBadge]
+    GuideBadgeRequired, GuideBadgeLink(address:) ->
+      guide_link_reasons(address, snippet, context)
+  }
+}
+
+/// Checks a guide badge link. The tag is checked on its own. The path, the
+/// anchor, the guide file, the heading of the anchor and the example in the
+/// guide are checked in order, each only when the one before it passed.
+fn guide_link_reasons(
+  address: String,
+  snippet: SnippetLink,
+  context: CheckContext,
+) -> List(Reason) {
+  case parse_guide_link(address, context.project.repository) {
+    Error(reason) -> [reason]
+    Ok(link) ->
+      list.append(
+        guide_tag_reasons(link, context.project.version),
+        check_guide(link, snippet, context)
+          |> result_to_reasons,
+      )
+  }
+}
+
+fn guide_tag_reasons(link: GuideLink, release_tag: String) -> List(Reason) {
+  case link.tag == release_tag {
+    True -> []
+    False -> [WrongGuideTag(found: link.tag, expected: release_tag)]
+  }
+}
+
+fn result_to_reasons(checked: Result(Nil, Reason)) -> List(Reason) {
+  case checked {
+    Ok(Nil) -> []
+    Error(reason) -> [reason]
+  }
+}
+
+fn check_guide(
+  link: GuideLink,
+  snippet: SnippetLink,
+  context: CheckContext,
+) -> Result(Nil, Reason) {
+  let guides = context.project.guides
+  use Nil <- result.try(require(
+    is_guide_path(link.path, guides),
+    NotAGuidePath(path: link.path, guides:),
+  ))
+  use Nil <- result.try(require(
+    link.anchor != "",
+    MissingGuideAnchor(link.path),
+  ))
+  use guide <- result.try(
+    context.read_source(link.path)
+    |> result.map_error(fn(error) { guide_error_reason(link.path, error) }),
+  )
+  use Nil <- result.try(require(
+    list.contains(heading_anchors(guide), decode_anchor(link.anchor)),
+    GuideAnchorNotFound(path: link.path, anchor: link.anchor),
+  ))
+  require(
+    shows_snippet(guide, snippet.path, context.project.repository),
+    ExampleNotInGuide(path: link.path, snippet: snippet.path),
+  )
+}
+
+fn require(condition: Bool, reason: Reason) -> Result(Nil, Reason) {
+  case condition {
+    True -> Ok(Nil)
+    False -> Error(reason)
+  }
+}
+
+/// Tells whether a path is a `.md` file under one of the guide
+/// directories. A trailing `/` of a directory is ignored.
+pub fn is_guide_path(path: String, guides: List(String)) -> Bool {
+  string.ends_with(path, ".md")
+  && list.any(guides, fn(directory) {
+    string.starts_with(path, remove_trailing_slashes(directory) <> "/")
+  })
+}
+
+fn remove_trailing_slashes(path: String) -> String {
+  case remove_suffix(path, "/") {
+    Ok(shorter) -> remove_trailing_slashes(shorter)
+    Error(Nil) -> path
+  }
+}
+
+fn guide_error_reason(path: String, error: simplifile.FileError) -> Reason {
+  case source_error_reason(path, error) {
+    MissingFile(path:) -> MissingGuideFile(path)
+    reason -> reason
+  }
+}
+
+/// An anchor as the browser shows it can be percent-encoded, for example
+/// `caf%C3%A9` for `café`. It is decoded before it is compared.
+fn decode_anchor(anchor: String) -> String {
+  uri.percent_decode(anchor) |> result.unwrap(anchor)
+}
+
+/// Tells whether a document has a heading, outside code fences, with a
+/// tested snippet badge that links to `snippet_path` in `repository`. The
+/// tag and the line range of the link are not compared.
+fn shows_snippet(
+  text: String,
+  snippet_path: String,
+  repository: GitHubRepository,
+) -> Bool {
+  numbered_lines(text, 1)
+  |> prose_lines([])
+  |> list.any(fn(line) {
+    parse_badge_heading(line.text)
+    |> result.try(parse_snippet_link(_, repository))
+    |> result.map(fn(link) { link.path == snippet_path })
+    |> result.unwrap(False)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Heading anchors
+// ---------------------------------------------------------------------------
+
+/// The anchors of the headings of a Markdown document, in order, as GitHub
+/// makes them.
+///
+/// A heading is a line outside code fences that starts with 1 to 6 `#`
+/// and a space. A closing run of `#` after a space is not part of its
+/// text. Each heading gets the anchor `heading_slug` of its text. When an
+/// anchor is already used by an earlier heading, the second heading gets
+/// the anchor with `-1` after it, the third `-2`, and so on.
+pub fn heading_anchors(markdown: String) -> List(String) {
+  let #(_seen, anchors) =
+    numbered_lines(markdown, 1)
+    |> prose_lines([])
+    |> list.filter_map(fn(line) { heading_text(line.text) })
+    |> list.map(heading_slug)
+    |> list.map_fold([], fn(seen, slug) {
+      #(
+        [slug, ..seen],
+        numbered_slug(slug, list.count(seen, fn(earlier) { earlier == slug })),
+      )
+    })
+  anchors
+}
+
+fn numbered_slug(slug: String, earlier_count: Int) -> String {
+  case earlier_count {
+    0 -> slug
+    _ -> slug <> "-" <> int.to_string(earlier_count)
+  }
+}
+
+/// The text of a heading line, without its `#` marks and without a closing
+/// run of `#`.
+fn heading_text(text: String) -> Result(String, Nil) {
+  let hashes = count_leading(text, "#", 0)
+  let rest = string.drop_start(text, hashes)
+  case hashes >= 1 && hashes <= 6 && string.starts_with(rest, " ") {
+    True -> Ok(remove_closing_hashes(string.trim(rest)))
+    False -> Error(Nil)
+  }
+}
+
+fn remove_closing_hashes(text: String) -> String {
+  let hashes = count_leading(string.reverse(text), "#", 0)
+  let before = string.drop_end(text, hashes)
+  case hashes > 0 && { before == "" || string.ends_with(before, " ") } {
+    True -> string.trim_end(before)
+    False -> text
+  }
+}
+
+/// The anchor that GitHub gives a heading with this text (one heading,
+/// with no `-1` for a repeated anchor; see `heading_anchors`).
+///
+/// The rule:
+///
+/// 1. Remove the Markdown and HTML marks. Inline HTML tags, such as a badge
+///    link, are removed, and the text between them is kept. A link
+///    `[text](address)` keeps its text. Backticks are removed, and the text
+///    of a code span is kept as it is. A `_` at the start or end of a word
+///    outside a code span is an emphasis mark, and is removed.
+/// 2. Remove the spaces at the start and the end.
+/// 3. Change the text to lowercase.
+/// 4. Remove each character that is not a letter, a digit, a space, a
+///    hyphen or an underscore. Letters and digits of every script are kept,
+///    and so are combining marks.
+/// 5. Change each space to a hyphen.
+///
+/// For example, ``The `RequestBody` type`` gives `the-requestbody-type`,
+/// `What's New` gives `whats-new` and `HTTP/2 over TLS` gives
+/// `http2-over-tls`.
+pub fn heading_slug(heading: String) -> String {
+  heading
+  |> string.split("`")
+  |> list.index_map(fn(part, index) {
+    case index % 2 {
+      0 -> remove_inline_marks(part)
+      _ -> part
+    }
+  })
+  |> string.join("")
+  |> string.trim
+  |> string.lowercase
+  |> keep_slug_characters
+  |> string.replace(" ", "-")
+}
+
+@external(erlang, "dream_snippets_ffi", "keep_slug_characters")
+fn keep_slug_characters(text: String) -> String
+
+fn remove_inline_marks(text: String) -> String {
+  text
+  |> remove_html_tags
+  |> keep_link_text
+  |> string.split(" ")
+  |> list.map(remove_emphasis_underscores)
+  |> string.join(" ")
+}
+
+/// Removes each `<tag ...>` and `</tag>`. A `<` that does not start a tag,
+/// as in `a < b`, is kept.
+fn remove_html_tags(text: String) -> String {
+  string.split(text, "<")
+  |> map_after_first(after_tag)
+  |> string.join("")
+}
+
+/// Changes each item of a list but the first one.
+fn map_after_first(items: List(String), change: fn(String) -> String) {
+  list.index_map(items, fn(item, index) {
+    case index {
+      0 -> item
+      _ -> change(item)
+    }
+  })
+}
+
+fn after_tag(part: String) -> String {
+  let is_tag =
+    starts_with_one_of(part, lowercase_letters <> uppercase_letters <> "/")
+  case is_tag, string.split_once(part, ">") {
+    True, Ok(#(_tag, after)) -> after
+    _, _ -> "<" <> part
+  }
+}
+
+/// Changes each `[text](address)` to `[text`. The `[` is removed later with
+/// the other marks.
+fn keep_link_text(text: String) -> String {
+  string.split(text, "](")
+  |> map_after_first(after_address)
+  |> string.join("")
+}
+
+fn after_address(part: String) -> String {
+  case string.split_once(part, ")") {
+    Ok(#(_address, after)) -> after
+    Error(Nil) -> "](" <> part
+  }
+}
+
+fn remove_emphasis_underscores(word: String) -> String {
+  let leading = count_leading(word, "_", 0)
+  let without_leading = string.drop_start(word, leading)
+  let trailing = count_leading(string.reverse(without_leading), "_", 0)
+  string.drop_end(without_leading, trailing)
 }
 
 // ---------------------------------------------------------------------------

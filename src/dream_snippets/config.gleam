@@ -13,14 +13,20 @@
 //// release_notes = ["releases"]
 //// gleam_source = ["src"]
 //// checked_from_version = "0.0.0"
-//// badge_guide = "https://hexdocs.pm/dream_snippets"
+//// guides = ["docs/guides"]
+//// badge_guide = "https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html"
+//// release_notes_guide = "https://hexdocs.pm/dream_snippets/guides/release-notes-template.html"
 //// ```
 ////
 //// Each setting is optional. The values above are the defaults. The
 //// default `checked_from_version` checks every changelog section and every
-//// release note. The default `badge_guide` is the README of this package
-//// on HexDocs, which shows the exact heading and badge to copy. A root
-//// list that is set replaces the default list of its kind, and each of its
+//// release note. `guides` are the directories that hold the guides of the
+//// project: the guide badge of a README example links to a `.md` file
+//// under one of them. The default `badge_guide` is the "Tested code
+//// blocks" guide of this package on HexDocs, which shows the exact
+//// headings and badges to copy. The default `release_notes_guide` is the
+//// "Release notes template" guide of this package on HexDocs. A root list
+//// that is set replaces the default list of its kind, and each of its
 //// paths must exist. A default path that does not exist is skipped.
 
 import dream_snippets/check.{
@@ -44,9 +50,21 @@ pub const gleam_toml_path = "gleam.toml"
 pub const default_checked_from_version = Version(0, 0, 0)
 
 /// The document that a malformed badge message names when `badge_guide` is
-/// not set: the README of this package on HexDocs, which shows the exact
-/// heading and badge to copy.
-pub const default_badge_guide = "https://hexdocs.pm/dream_snippets"
+/// not set: the "Tested code blocks" guide of this package on HexDocs,
+/// which shows the exact headings and badges to copy.
+pub const default_badge_guide =
+  "https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html"
+
+/// The document that a release notes template message names when
+/// `release_notes_guide` is not set: the "Release notes template" guide of
+/// this package on HexDocs, which shows the template.
+pub const default_release_notes_guide =
+  "https://hexdocs.pm/dream_snippets/guides/release-notes-template.html"
+
+/// The directories that hold the guides of a project when `guides` is not
+/// set. The guide badge of a README example links to a `.md` file under
+/// one of them.
+pub const default_guides = ["docs/guides"]
 
 /// Whether a checked root must exist.
 pub type RootPresence {
@@ -90,8 +108,8 @@ pub type ConfigError {
   /// A key has a value of the wrong type. `key` is the dotted key,
   /// `expected` says what it must be, and `found` is the TOML type it has.
   WrongSettingType(key: String, expected: String, found: String)
-  /// A root list in `[tools.dream_snippets]` holds a value that is not a
-  /// string. `key` is the dotted key of the list.
+  /// A root list or `guides` in `[tools.dream_snippets]` holds a value that
+  /// is not a string. `key` is the dotted key of the list.
   RootNotAString(key: String)
   /// `[tools.dream_snippets]` has a key that the check does not know.
   UnknownSetting(key: String)
@@ -110,7 +128,7 @@ const root_settings = [
 
 const known_settings = [
   "markdown", "changelog", "release_notes", "gleam_source",
-  "checked_from_version", "badge_guide",
+  "checked_from_version", "guides", "badge_guide", "release_notes_guide",
 ]
 
 /// The places that the check reads when `[tools.dream_snippets]` sets none:
@@ -141,8 +159,8 @@ pub fn default_roots() -> List(CheckedRoot) {
 /// ## Returns
 ///
 /// The project (`name`, `version`, the GitHub `user` and `repo` of
-/// `repository`, and `badge_guide`), the checked roots and the
-/// `checked_from_version`.
+/// `repository`, `badge_guide`, `release_notes_guide` and `guides`), the
+/// checked roots and the `checked_from_version`.
 ///
 /// ## Examples
 ///
@@ -182,10 +200,19 @@ pub fn parse(gleam_toml: String) -> Result(Config, ConfigError) {
   use repository <- result.try(read_repository(document))
   use settings <- result.try(read_settings(document))
   use badge_guide <- result.try(read_badge_guide(settings))
+  use release_notes_guide <- result.try(read_release_notes_guide(settings))
+  use guides <- result.try(read_guides(settings))
   use checked_from_version <- result.try(read_checked_from_version(settings))
   use roots <- result.try(read_roots(settings))
   Ok(Config(
-    project: Project(name:, version:, repository:, badge_guide:),
+    project: Project(
+      name:,
+      version:,
+      repository:,
+      badge_guide:,
+      release_notes_guide:,
+      guides:,
+    ),
     roots:,
     checked_from_version:,
   ))
@@ -343,6 +370,34 @@ fn read_badge_guide(
 ) -> Result(String, ConfigError) {
   use found <- result.map(optional_string(settings, "badge_guide"))
   option.unwrap(found, default_badge_guide)
+}
+
+fn read_release_notes_guide(
+  settings: Dict(String, Toml),
+) -> Result(String, ConfigError) {
+  use found <- result.map(optional_string(settings, "release_notes_guide"))
+  option.unwrap(found, default_release_notes_guide)
+}
+
+fn read_guides(
+  settings: Dict(String, Toml),
+) -> Result(List(String), ConfigError) {
+  let key = settings_key <> ".guides"
+  use found <- result.try(
+    tom.get_array(settings, ["guides"])
+    |> optional_value(key, "an array of strings"),
+  )
+  case found {
+    None -> Ok(default_guides)
+    Some(items) -> list.try_map(items, fn(item) { string_item(item, key) })
+  }
+}
+
+fn string_item(item: Toml, key: String) -> Result(String, ConfigError) {
+  case item {
+    tom.String(text) -> Ok(text)
+    _ -> Error(RootNotAString(key))
+  }
 }
 
 fn read_checked_from_version(

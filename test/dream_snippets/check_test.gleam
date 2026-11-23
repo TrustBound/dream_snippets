@@ -738,6 +738,8 @@ fn describe_tests() -> UnitNode {
       version: "1.2.0",
       repository: GitHubRepository(owner: "me", name: "my_app"),
       badge_guide: "CONTRIBUTING.md",
+      release_notes_guide: "RELEASING.md",
+      guides: ["docs/guides"],
     )
   group("describe_reason", [
     it("describes every reason of a snippet block", fn() {

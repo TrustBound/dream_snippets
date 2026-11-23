@@ -54,7 +54,9 @@ version = \"9\"
             name: "dream",
             version: "3.0.0",
             repository: GitHubRepository(owner: "TrustBound", name: "dream"),
-            badge_guide: "https://hexdocs.pm/dream_snippets",
+            badge_guide: "https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html",
+            release_notes_guide: "https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
+            guides: ["docs/guides"],
           ),
           roots: [
             CheckedRoot("README.md", MarkdownDocument, MayBeMissing),
@@ -82,6 +84,8 @@ release_notes = []
 gleam_source = [\"src\"]
 checked_from_version = \"1.0.0\"
 badge_guide = \"CONTRIBUTING.md\"
+release_notes_guide = \"docs/release-notes.md\"
+guides = [\"docs/guides\", \"examples/guides/\"]
 "
 
       // Act
@@ -97,6 +101,8 @@ badge_guide = \"CONTRIBUTING.md\"
             version: "1.2.0",
             repository: GitHubRepository(owner: "me", name: "my_app"),
             badge_guide: "CONTRIBUTING.md",
+            release_notes_guide: "docs/release-notes.md",
+            guides: ["docs/guides", "examples/guides/"],
           ),
           roots: [
             CheckedRoot("README.md", MarkdownDocument, MustExist),
@@ -129,7 +135,9 @@ badge_guide = \"CONTRIBUTING.md\"
               name: "my_app",
               version: "1.2.0",
               repository: GitHubRepository(owner: "me", name: "my_app"),
-              badge_guide: "https://hexdocs.pm/dream_snippets",
+              badge_guide: "https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html",
+              release_notes_guide: "https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
+              guides: ["docs/guides"],
             ),
             roots: [
               CheckedRoot("README.md", MarkdownDocument, MustExist),
@@ -304,6 +312,38 @@ fn parse_error_tests() -> UnitNode {
       |> be_equal(Error(RootNotAString("tools.dream_snippets.changelog")))
       |> or_fail_with("Each root must be a string")
     }),
+    it("fails a guides setting that is not an array", fn() {
+      // Act
+      let parsed =
+        config.parse(
+          project_lines <> "\n[tools.dream_snippets]\nguides = \"docs\"\n",
+        )
+
+      // Assert
+      parsed
+      |> should
+      |> be_equal(
+        Error(WrongSettingType(
+          key: "tools.dream_snippets.guides",
+          expected: "an array of strings",
+          found: "String",
+        )),
+      )
+      |> or_fail_with("The guides must be an array")
+    }),
+    it("fails a guides setting that holds a value that is not a string", fn() {
+      // Act
+      let parsed =
+        config.parse(
+          project_lines <> "\n[tools.dream_snippets]\nguides = [1]\n",
+        )
+
+      // Assert
+      parsed
+      |> should
+      |> be_equal(Error(RootNotAString("tools.dream_snippets.guides")))
+      |> or_fail_with("Each guide directory must be a string")
+    }),
     it("fails a badge guide that is not a string", fn() {
       // Act
       let parsed =
@@ -322,6 +362,25 @@ fn parse_error_tests() -> UnitNode {
         )),
       )
       |> or_fail_with("The badge guide must be a string")
+    }),
+    it("fails a release notes guide that is not a string", fn() {
+      // Act
+      let parsed =
+        config.parse(
+          project_lines <> "\n[tools.dream_snippets]\nrelease_notes_guide = 1\n",
+        )
+
+      // Assert
+      parsed
+      |> should
+      |> be_equal(
+        Error(WrongSettingType(
+          key: "tools.dream_snippets.release_notes_guide",
+          expected: "a string",
+          found: "Int",
+        )),
+      )
+      |> or_fail_with("The release notes guide must be a string")
     }),
     it("fails a checked_from_version that is not a version", fn() {
       // Act
@@ -372,7 +431,7 @@ fn describe_error_tests() -> UnitNode {
         "gleam.toml names a gitlab repository; the badges link at GitHub, so the repository type must be github",
         "version in gleam.toml must be a string, but its TOML type is Int",
         "tools.dream_snippets.changelog in gleam.toml must be an array of strings",
-        "tools.dream_snippets.roots in gleam.toml is not a setting; the settings are markdown, changelog, release_notes, gleam_source, checked_from_version, badge_guide",
+        "tools.dream_snippets.roots in gleam.toml is not a setting; the settings are markdown, changelog, release_notes, gleam_source, checked_from_version, guides, badge_guide, release_notes_guide",
         "tools.dream_snippets.checked_from_version in gleam.toml is \"3\", which is not a major.minor.patch version",
       ])
       |> or_fail_with("Each error should have its message")

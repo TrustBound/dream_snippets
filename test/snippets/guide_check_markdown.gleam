@@ -1,4 +1,4 @@
-//// README: check one document
+//// Guide: check one document
 ////
 //// Checks a Markdown document with the pure checks and a fake git.
 
@@ -15,6 +15,8 @@ pub fn check_guide(guide: String) -> Report {
       version: "1.2.0",
       repository: GitHubRepository(owner: "me", name: "my_app"),
       badge_guide: "CONTRIBUTING.md",
+      release_notes_guide: "CONTRIBUTING.md",
+      guides: ["docs/guides"],
     )
   let context =
     CheckContext(

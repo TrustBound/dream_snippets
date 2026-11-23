@@ -11,17 +11,17 @@ import dream_test/unit.{describe, group, it}
 import fixtures/project
 import snippets/doc_check_project
 import snippets/doc_parse_config
-import snippets/readme_check_markdown
+import snippets/guide_check_markdown
 
 pub fn tests() -> TestSuite {
   describe("snippets", [
-    group("readme_check_markdown.check_guide", [
+    group("guide_check_markdown.check_guide", [
       it("finds a gleam block with no badge heading", fn() {
         // Arrange
         let guide = "Some prose.\n\n```gleam\nx\n```\n"
 
         // Act
-        let report = readme_check_markdown.check_guide(guide)
+        let report = guide_check_markdown.check_guide(guide)
 
         // Assert
         report
@@ -48,7 +48,9 @@ pub fn tests() -> TestSuite {
               name: "my_app",
               version: "1.2.0",
               repository: GitHubRepository(owner: "me", name: "my_app"),
-              badge_guide: "https://hexdocs.pm/dream_snippets",
+              badge_guide: "https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html",
+              release_notes_guide: "https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
+              guides: ["docs/guides"],
             ),
             roots: [
               CheckedRoot("README.md", MarkdownDocument, MayBeMissing),

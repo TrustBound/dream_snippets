@@ -8,6 +8,15 @@ links = [
     { title = "GitHub", href = "https://github.com/TrustBound/dream_snippets" },
 ]
 
+[documentation]
+pages = [
+    { title = "Getting started", path = "guides/getting-started.html", source = "./docs/guides/getting-started.md" },
+    { title = "Tested code blocks", path = "guides/tested-code-blocks.html", source = "./docs/guides/tested-code-blocks.md" },
+    { title = "Release notes template", path = "guides/release-notes-template.html", source = "./docs/guides/release-notes-template.md" },
+    { title = "Configuration", path = "guides/configuration.html", source = "./docs/guides/configuration.md" },
+    { title = "Use it from Gleam", path = "guides/use-from-gleam.html", source = "./docs/guides/use-from-gleam.md" },
+]
+
 [dependencies]
 gleam_stdlib = ">= 1.0.0 and < 2.0.0"
 simplifile = ">= 2.4.0 and < 3.0.0"
@@ -18,4 +27,4 @@ tom = ">= 2.0.2 and < 3.0.0"
 dream_test = { git = "https://github.com/TrustBound/dream_test.git", ref = "1639959578a14ae3577f8e3ae5cac058f933aa53" }
 
 [tools.dream_snippets]
-markdown = ["README.md", "SECURITY.md", "CONTRIBUTING.md"]
+markdown = ["README.md", "SECURITY.md", "CONTRIBUTING.md", "docs"]

@@ -12,6 +12,7 @@ import dream_test/suite.{type TestSuite}
 import dream_test/unit.{type UnitNode, describe, group, it}
 import fixtures/project
 import gleam/list
+import gleam/string
 import simplifile
 
 const project_toml =
@@ -26,8 +27,32 @@ checked_from_version = \"1.1.0\"
 const snippet_badge_end =
   "\"><img align=\"right\" alt=\"Tested snippet\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square\"></a>"
 
+const guide_badge_end =
+  "\"><img align=\"right\" alt=\"Guide\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>"
+
 const diff_badge_end =
   "\"><img align=\"right\" alt=\"Tested diff\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-diff-lightgreen.svg?style=flat-square\"></a>"
+
+/// Release notes of app 1.1.0 that follow the release notes template.
+const release_notes =
+  "# app 1.1.0 Release Notes
+
+**Release Date:** 2026-11-20
+
+## Key Highlights
+
+## What's New
+
+## Testing
+
+## Upgrading
+
+### Migration Guide
+
+## Documentation
+
+## Community
+"
 
 const old_app = "pub fn name() {\n  \"old\"\n}\n"
 
@@ -49,22 +74,29 @@ fn check_project_tests() -> UnitNode {
       let readme =
         "# App\n\n### Hello <a href=\"https://github.com/me/app/blob/1.1.0/test/snippets/hello.gleam"
         <> snippet_badge_end
+        <> " <a href=\"https://github.com/me/app/blob/1.1.0/docs/guides/hello.md#hello"
+        <> guide_badge_end
         <> "\n\n```gleam\npub fn hello() {\n  \"hi\"\n}\n```\n\n#### Rename <a href=\"https://github.com/me/app/compare/1.0.0...1.1.0#diff-"
         <> check.path_digest("src/app.gleam")
         <> diff_badge_end
         <> "\n\n```diff\n--- a/src/app.gleam\n+++ b/src/app.gleam\n-  \"old\"\n+  \"new\"\n```\n"
       let untested = "```gleam\nx\n```\n"
+      let guide =
+        "# Hello guide\n\n### Hello <a href=\"https://github.com/me/app/blob/1.1.0/test/snippets/hello.gleam"
+        <> snippet_badge_end
+        <> "\n\n```gleam\npub fn hello() {\n  \"hi\"\n}\n```\n"
       let assert Ok(directory) =
         project.write_project("project_scope", [
           #("gleam.toml", project_toml),
           #("README.md", readme),
           #("test/snippets/hello.gleam", "pub fn hello() {\n  \"hi\"\n}\n"),
           #("docs/guide.md", "```bash\ngleam run\n```\n"),
+          #("docs/guides/hello.md", guide),
           #("docs/deep/more.md", "Text.\n"),
           #("docs/notes.txt", untested),
           #("docs/build/skipped.md", untested),
           #("releases/release-1.0.0.md", untested),
-          #("releases/release-1.1.0.md", "Notes.\n"),
+          #("releases/release-1.1.0.md", release_notes),
           #("CHANGELOG.md", "## [1.1.0]\n\nText.\n\n## [1.0.0]\n\n" <> untested),
           #("src/app.gleam", old_app),
         ])
@@ -81,7 +113,7 @@ fn check_project_tests() -> UnitNode {
       |> should
       |> be_equal(Output(
         standard_output: [
-          "1 blocks and 1 diff blocks checked in 6 files, 0 problems",
+          "2 blocks and 1 diff blocks checked in 7 files, 0 problems",
         ],
         standard_error: [],
         exit_status: 0,
@@ -116,6 +148,43 @@ fn check_project_tests() -> UnitNode {
       |> or_fail_with("Both problems should be listed before the summary")
     }),
     it(
+      "checks the release notes template of checked release notes, with the configured guide",
+      fn() {
+        // Arrange
+        let gleam_toml =
+          project_toml <> "release_notes_guide = \"docs/releasing.md\"\n"
+        let notes =
+          string.replace(release_notes, "## Testing\n\n", "")
+          <> "\n```gleam\nx\n```\n"
+        let assert Ok(directory) =
+          project.write_project("project_release_notes", [
+            #("gleam.toml", gleam_toml),
+            #("releases/release-1.0.0.md", "Notes.\n"),
+            #("releases/release-1.1.0.md", notes),
+          ])
+
+        // Act
+        let result =
+          dream_snippets.output(dream_snippets.check_project(directory))
+
+        // Assert
+        result
+        |> should
+        |> be_equal(Output(
+          standard_output: [
+            "releases/release-1.1.0.md:1: the section \"## Testing\" is missing, but the template requires it; see \"Release notes template\" in docs/releasing.md",
+            "releases/release-1.1.0.md:17: this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)",
+            "1 blocks and 0 diff blocks checked in 1 files, 2 problems",
+          ],
+          standard_error: [],
+          exit_status: 1,
+        ))
+        |> or_fail_with(
+          "The template problem and the block problem should both be listed",
+        )
+      },
+    ),
+    it(
       "checks every changelog section and names HexDocs when the table is left out",
       fn() {
         // Arrange
@@ -140,7 +209,7 @@ fn check_project_tests() -> UnitNode {
         |> be_equal(Output(
           standard_output: [
             "CHANGELOG.md:3: this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)",
-            "README.md:3: the tested snippet badge is not in the exact format; copy it from https://hexdocs.pm/dream_snippets",
+            "README.md:3: the tested snippet badge is not in the exact format; copy it from https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html",
             "2 blocks and 0 diff blocks checked in 2 files, 2 problems",
           ],
           standard_error: [],

@@ -1,10 +1,21 @@
 -module(dream_snippets_ffi).
--export([sha256_hex/1, run_program/3]).
+-export([sha256_hex/1, run_program/3, keep_slug_characters/1]).
 
 %% The SHA-256 digest of a text, as 64 lowercase hex digits. GitHub's
 %% compare view uses the digest of a file's path as that file's anchor.
 sha256_hex(Text) ->
     binary:encode_hex(crypto:hash(sha256, Text), lowercase).
+
+%% Remove each character that is not a letter, a combining mark, a decimal
+%% digit, an underscore, a space or a hyphen. Letters and digits of every
+%% script are kept. This is the character rule of GitHub's heading anchors.
+keep_slug_characters(Text) ->
+    re:replace(
+        Text,
+        <<"[^\\p{L}\\p{M}\\p{Nd}_ -]">>,
+        <<>>,
+        [global, unicode, ucp, {return, binary}]
+    ).
 
 %% Run a program with a list of arguments in a directory, and return its
 %% standard output.
