@@ -12,9 +12,11 @@ links = [
 pages = [
     { title = "Getting started", path = "guides/getting-started.html", source = "./docs/guides/getting-started.md" },
     { title = "Tested code blocks", path = "guides/tested-code-blocks.html", source = "./docs/guides/tested-code-blocks.md" },
+    { title = "Fix a failed check", path = "guides/fixing-check-failures.html", source = "./docs/guides/fixing-check-failures.md" },
+    { title = "Show an API change in an upgrade guide", path = "guides/upgrade-guides.html", source = "./docs/guides/upgrade-guides.md" },
     { title = "Release notes template", path = "guides/release-notes-template.html", source = "./docs/guides/release-notes-template.md" },
-    { title = "Configuration", path = "guides/configuration.html", source = "./docs/guides/configuration.md" },
     { title = "Use it from Gleam", path = "guides/use-from-gleam.html", source = "./docs/guides/use-from-gleam.md" },
+    { title = "Settings and checks reference", path = "guides/reference.html", source = "./docs/guides/reference.md" },
 ]
 
 [dependencies]

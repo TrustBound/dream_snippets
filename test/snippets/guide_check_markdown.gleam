@@ -21,10 +21,14 @@ pub fn check_guide(guide: String) -> Report {
   let context =
     CheckContext(
       project:,
-      checked_from_version: Version(1, 0, 0),
+      checked_from_version: Version(1, 0, 0, []),
       read_source: simplifile.read,
       tag_exists: fn(_tag) { Error(git.GitNotFound) },
       diff_from_tag: fn(_tag, _path) { Error(git.GitNotFound) },
+      diff_between_tags: fn(_old_tag, _new_tag, _path) {
+        Error(git.GitNotFound)
+      },
+      file_at_tag: fn(_tag, _path) { Error(git.GitNotFound) },
     )
   check.check_markdown("docs/guide.md", guide, context)
 }

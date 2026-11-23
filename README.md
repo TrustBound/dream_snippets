@@ -22,7 +22,7 @@
 
 A code block with no tested snippet can be wrong, and nobody finds out until a reader tries it. dream_snippets is the check that every [Dream](https://github.com/TrustBound/dream) repository runs in CI to stop that: each Gleam code block in the README, the guides and the doc comments must be a copy of a snippet file that the tests compile and run. It works in any Gleam project on GitHub.
 
-Sent here by a "not in the exact format" message? Copy the heading and badges from the [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md) guide.
+Sent here by a "not in the exact format" message? Copy the heading and badges from [Copy a badge](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md#copy-a-badge) in the Tested code blocks guide.
 
 ## Features
 
@@ -31,6 +31,8 @@ Sent here by a "not in the exact format" message? Copy the heading and badges fr
 - ✅ Checks that each README example links to the guide section that shows it
 - ✅ Finds Gleam code hidden in `text`, `bash` or unlabelled fences
 - ✅ Checks `diff` blocks against the real `git diff` from a release tag
+- ✅ Checks code at an older release against the file at that release tag
+- ✅ Checks the release notes and changelog sections of an older release against the files at its tag, so a version bump needs no change to them
 - ✅ Checks that release notes follow the release notes template
 - ✅ Reads the repository and the release tag from `gleam.toml`, so it needs no setup
 - ✅ No network access
@@ -64,11 +66,13 @@ pub fn summary_of(directory: String) -> List(String) {
 
 ## Guides
 
-- [Getting started](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/getting-started.md): install the package, run the check, and run it in CI
-- [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md): the exact heading and badge forms, the guide badge of README examples, and diff blocks
-- [Release notes template](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/release-notes-template.md): the template that release notes must follow
-- [Configuration](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/configuration.md): the settings in `gleam.toml` and their defaults
-- [Use it from Gleam](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/use-from-gleam.md): call the checks from Gleam code
+- [Getting started](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/getting-started.md): prove the code examples of a project, from the first snippet to the check in CI
+- [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md): every badge to copy, line ranges, doc comments, README examples and their guide badge
+- [Fix a failed check](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/fixing-check-failures.md): each message the check prints, what it means, and the fix
+- [Show an API change in an upgrade guide](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/upgrade-guides.md): diff blocks and code at an older release, proven against git
+- [Release notes template](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/release-notes-template.md): write release notes that follow the template, with a complete example
+- [Use it from Gleam](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/use-from-gleam.md): run the check from your tests or your own tools
+- [Settings and checks reference](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/reference.md): every setting with its default, and every check
 
 ## Design Principles
 

@@ -28,6 +28,13 @@
 //// "Release notes template" guide of this package on HexDocs. A root list
 //// that is set replaces the default list of its kind, and each of its
 //// paths must exist. A default path that does not exist is skipped.
+////
+//// A `release_notes` path is a directory or one file. A directory is
+//// walked for `release-<version>.md` files, and files with other names are
+//// skipped. A file path must have a name of the form
+//// `release-<version>.md`, or the check reports one problem at line 1 of
+//// that file. In both cases, the notes of a version before
+//// `checked_from_version` are skipped.
 
 import dream_snippets/check.{
   type DocumentKind, type Project, type Version, Changelog, GitHubRepository,
@@ -47,7 +54,7 @@ pub const gleam_toml_path = "gleam.toml"
 /// The first version whose release notes and changelog section are checked
 /// when `checked_from_version` is not set: `0.0.0`, so every version is
 /// checked.
-pub const default_checked_from_version = Version(0, 0, 0)
+pub const default_checked_from_version = Version(0, 0, 0, [])
 
 /// The document that a malformed badge message names when `badge_guide` is
 /// not set: the "Tested code blocks" guide of this package on HexDocs,
@@ -138,6 +145,23 @@ const known_settings = [
 ///
 /// These are never walked, on purpose: `build/`, `deps/`, `_build/` and
 /// `node_modules/`, which hold build output and the docs of other projects.
+///
+/// ## Examples
+///
+/// ### List the default roots <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_default_roots.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/config
+/// import gleam/list
+///
+/// pub fn default_paths() -> List(String) {
+///   // Returns [
+///   //   "README.md", "SECURITY.md", "docs", "examples", "CHANGELOG.md",
+///   //   "releases", "src",
+///   // ]
+///   list.map(config.default_roots(), fn(root) { root.path })
+/// }
+/// ```
 pub fn default_roots() -> List(CheckedRoot) {
   [
     CheckedRoot("README.md", MarkdownDocument, MayBeMissing),
@@ -218,8 +242,26 @@ pub fn parse(gleam_toml: String) -> Result(Config, ConfigError) {
   ))
 }
 
-/// Describes why `gleam.toml` cannot be used, in one line.
+/// Describes why `gleam.toml` cannot be used, in one line (see
+/// `check.one_line`).
+///
+/// ## Examples
+///
+/// ### Describe a configuration error <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_describe_config_error.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/config.{NameNotFound}
+///
+/// pub fn name_not_found_message() -> String {
+///   // Returns "gleam.toml has no name = \"...\" line before its first [section]"
+///   config.describe_error(NameNotFound)
+/// }
+/// ```
 pub fn describe_error(error: ConfigError) -> String {
+  check.one_line(error_text(error))
+}
+
+fn error_text(error: ConfigError) -> String {
   case error {
     InvalidToml(got:, expected:) ->
       gleam_toml_path
@@ -231,10 +273,10 @@ pub fn describe_error(error: ConfigError) -> String {
     RepeatedKey(key:) -> gleam_toml_path <> " sets the key " <> key <> " twice"
     VersionNotFound ->
       gleam_toml_path
-      <> " has no version = \"...\" line before its first [section]."
+      <> " has no version = \"...\" line before its first [section]"
     NameNotFound ->
       gleam_toml_path
-      <> " has no name = \"...\" line before its first [section]."
+      <> " has no name = \"...\" line before its first [section]"
     RepositoryNotFound ->
       gleam_toml_path
       <> " has no repository = { type = \"github\", user = \"...\", repo = \"...\" }"

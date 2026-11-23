@@ -7,14 +7,15 @@
 //// read real docs, snippets or history.
 
 import dream_snippets/check.{
-  BlockDiffers, CheckContext, DiffHunk, DiffLineNotFound, EmptyDiffBlock,
-  ForeignLink, GitHubRepository, GitUnavailable, HiddenGleamCode,
+  AlphanumericIdentifier, BlockDiffers, CheckContext, DiffHunk, DiffLineNotFound,
+  EmptyDiffBlock, ForeignLink, GitHubRepository, GitUnavailable, HiddenGleamCode,
   HunkHeaderNotFound, LineRangePastEnd, MalformedBadge, MalformedDiffBadge,
   MalformedLineRange, MissingBadgeHeading, MissingDiffBadgeHeading,
   MissingDiffFileHeader, MissingFile, MissingOldTag, NoDiffForPath,
-  NotCompareLink, OldTestedSourceLine, Problem, Project, Report,
-  ReversedLineRange, SnippetLink, UnclosedFence, UnreadableFile, Version,
-  WholeFile, WrongDiffAnchor, WrongNewTag, WrongTag,
+  NotCompareLink, NumericIdentifier, OldTestedSourceLine, Problem, Project,
+  ReleaseNotesTitleMismatch, Report, ReversedLineRange, SnippetLink,
+  UnclosedFence, UnreadableFile, Version, WholeFile, WorkingTree,
+  WrongDiffAnchor, WrongNewTag, WrongTag,
 }
 import dream_snippets/git.{GitFailed, GitNotFound}
 import dream_test/matchers.{be_equal, or_fail_with, should}
@@ -28,6 +29,7 @@ import fixtures/check_context.{
 }
 import gleam/list
 import gleam/order
+import gleam/result
 import gleam/string
 import simplifile
 
@@ -41,6 +43,9 @@ pub fn tests() -> TestSuite {
     report_tests(),
     digest_tests(),
     version_tests(),
+    precedence_tests(),
+    one_line_tests(),
+    summary_tests(),
     fence_tests(),
     heading_tests(),
     link_tests(),
@@ -50,17 +55,212 @@ pub fn tests() -> TestSuite {
   ])
 }
 
+/// The order of two version texts, or `Error(Nil)` when one is not a
+/// version.
+fn precedence(first: String, second: String) -> Result(order.Order, Nil) {
+  case check.parse_release_version(first), check.parse_release_version(second) {
+    Ok(first_version), Ok(second_version) ->
+      Ok(check.compare_versions(first_version, second_version))
+    _, _ -> Error(Nil)
+  }
+}
+
+fn precedence_tests() -> UnitNode {
+  group("semver precedence", [
+    it("puts a pre-release before its release", fn() {
+      // Act
+      let found = precedence("2.0.0-rc.1", "2.0.0")
+
+      // Assert
+      found
+      |> should
+      |> be_equal(Ok(order.Lt))
+      |> or_fail_with("2.0.0-rc.1 should come before 2.0.0")
+    }),
+    it("puts a pre-release after the release before it", fn() {
+      // Act
+      let found = precedence("2.0.0-alpha", "1.9.9")
+
+      // Assert
+      found
+      |> should
+      |> be_equal(Ok(order.Gt))
+      |> or_fail_with("2.0.0-alpha should come after 1.9.9")
+    }),
+    it("compares numeric identifiers as numbers", fn() {
+      // Act
+      let found = precedence("1.0.0-beta.2", "1.0.0-beta.11")
+
+      // Assert
+      found
+      |> should
+      |> be_equal(Ok(order.Lt))
+      |> or_fail_with("beta.2 should come before beta.11")
+    }),
+    it("compares alphanumeric identifiers in ASCII order", fn() {
+      // Act
+      let found = precedence("1.0.0-Beta", "1.0.0-alpha")
+
+      // Assert
+      found
+      |> should
+      |> be_equal(Ok(order.Lt))
+      |> or_fail_with("B (66) should come before a (97)")
+    }),
+    it("puts a numeric identifier before an alphanumeric one", fn() {
+      // Act
+      let found = precedence("1.0.0-alpha.1", "1.0.0-alpha.beta")
+
+      // Assert
+      found
+      |> should
+      |> be_equal(Ok(order.Lt))
+      |> or_fail_with("alpha.1 should come before alpha.beta")
+    }),
+    it("puts an alphanumeric identifier after a numeric one", fn() {
+      // Act
+      let found = precedence("1.0.0-alpha.beta", "1.0.0-alpha.1")
+
+      // Assert
+      found
+      |> should
+      |> be_equal(Ok(order.Gt))
+      |> or_fail_with("alpha.beta should come after alpha.1")
+    }),
+    it("puts the shorter list of equal identifiers first", fn() {
+      // Act
+      let found = precedence("1.0.0-alpha", "1.0.0-alpha.1")
+
+      // Assert
+      found
+      |> should
+      |> be_equal(Ok(order.Lt))
+      |> or_fail_with("alpha should come before alpha.1")
+    }),
+    it("finds equal pre-releases equal", fn() {
+      // Act
+      let found = precedence("1.0.0-rc.1", "1.0.0-rc.1")
+
+      // Assert
+      found
+      |> should
+      |> be_equal(Ok(order.Eq))
+      |> or_fail_with("The same pre-release should be equal")
+    }),
+    it("sorts the example of semver.org section 11", fn() {
+      // Arrange
+      let texts = [
+        "1.0.0", "1.0.0-rc.1", "1.0.0-alpha.beta", "1.0.0-beta.11",
+        "1.0.0-alpha", "1.0.0-beta", "1.0.0-alpha.1", "1.0.0-beta.2",
+      ]
+
+      // Act
+      let sorted =
+        list.sort(texts, fn(first, second) {
+          precedence(first, second) |> result.unwrap(order.Eq)
+        })
+
+      // Assert
+      sorted
+      |> should
+      |> be_equal([
+        "1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.beta", "1.0.0-beta",
+        "1.0.0-beta.2", "1.0.0-beta.11", "1.0.0-rc.1", "1.0.0",
+      ])
+      |> or_fail_with("The order should be the order of semver.org")
+    }),
+    it("rejects pre-release identifiers that semver does not allow", fn() {
+      // Arrange
+      let texts = [
+        "1.0.0-", "1.0.0-rc..1", "1.0.0-01", "1.0.0-rc_1", "1.0.0-rc.",
+      ]
+
+      // Act
+      let versions = list.map(texts, check.parse_release_version)
+
+      // Assert
+      versions
+      |> should
+      |> be_equal([Error(Nil), Error(Nil), Error(Nil), Error(Nil), Error(Nil)])
+      |> or_fail_with("Each text should not be a version")
+    }),
+  ])
+}
+
+fn one_line_tests() -> UnitNode {
+  group("one-line messages", [
+    it("shows a line break in a file name in a visible form", fn() {
+      // Arrange
+      let problem = Problem("docs/a\nb.md", 3, UnclosedFence)
+
+      // Act
+      let line = check.describe_problem(problem, project())
+
+      // Assert
+      line
+      |> should
+      |> be_equal("docs/a\\nb.md:3: this code fence has no closing fence")
+      |> or_fail_with("The problem should stay on one line")
+    }),
+    it("shows a carriage return and a tab in a title in a visible form", fn() {
+      // Arrange
+      let reason =
+        ReleaseNotesTitleMismatch(found: "# dream\t3.0.0\r", version: "3.0.0")
+
+      // Act
+      let text = check.describe_reason(reason, project())
+
+      // Assert
+      text
+      |> should
+      |> be_equal(
+        "the first line is \"# dream\\t3.0.0\\r\", but the template wants the title \"# <Name> 3.0.0 Release Notes\"; see \"Release notes template\" in docs/contributing/release-notes.md",
+      )
+      |> or_fail_with("The reason should stay on one line")
+    }),
+  ])
+}
+
+fn summary_tests() -> UnitNode {
+  group("summary", [
+    it("uses the singular for 1", fn() {
+      // Act
+      let line = check.summary(1, 1, 1, 1)
+
+      // Assert
+      line
+      |> should
+      |> be_equal("1 block and 1 diff block checked in 1 file, 1 problem")
+      |> or_fail_with("1 should take the singular")
+    }),
+    it("uses the plural for 0", fn() {
+      // Act
+      let line = check.summary(0, 0, 0, 0)
+
+      // Assert
+      line
+      |> should
+      |> be_equal("0 blocks and 0 diff blocks checked in 0 files, 0 problems")
+      |> or_fail_with("0 should take the plural")
+    }),
+  ])
+}
+
 fn version_tests() -> UnitNode {
   group("versions", [
-    it("reads a pre-release version as its release", fn() {
+    it("reads the identifiers of a pre-release version", fn() {
       // Act
       let version = check.parse_release_version("3.0.0-rc.1")
 
       // Assert
       version
       |> should
-      |> be_equal(Ok(Version(3, 0, 0)))
-      |> or_fail_with("The -rc.1 part should be ignored")
+      |> be_equal(
+        Ok(
+          Version(3, 0, 0, [AlphanumericIdentifier("rc"), NumericIdentifier(1)]),
+        ),
+      )
+      |> or_fail_with("The -rc.1 part should be read")
     }),
     it("rejects a version number with a leading zero", fn() {
       // Act
@@ -74,7 +274,8 @@ fn version_tests() -> UnitNode {
     }),
     it("compares versions by major, minor and patch", fn() {
       // Act
-      let order = check.compare_versions(Version(3, 1, 0), Version(3, 0, 9))
+      let order =
+        check.compare_versions(Version(3, 1, 0, []), Version(3, 0, 9, []))
 
       // Assert
       order
@@ -102,7 +303,7 @@ fn version_tests() -> UnitNode {
         let checked =
           list.map(names, check.is_checked_changelog_section(
             _,
-            Version(3, 0, 0),
+            Version(3, 0, 0, []),
           ))
 
         // Assert
@@ -659,7 +860,11 @@ fn more_diff_tests() -> UnitNode {
         Problem(
           "doc.md",
           7,
-          DiffLineNotFound(path: diff_path, old_tag: "2.4.1"),
+          DiffLineNotFound(
+            path: diff_path,
+            old_tag: "2.4.1",
+            new_side: WorkingTree,
+          ),
         ),
       ])
       |> or_fail_with("The made-up line should fail at its line")
@@ -800,9 +1005,17 @@ fn describe_tests() -> UnitNode {
         MissingOldTag("1.9.9"),
         GitUnavailable(GitNotFound),
         GitUnavailable(GitFailed(status: 128, output: "")),
-        NoDiffForPath(path: "src/same.gleam", old_tag: "2.4.1"),
+        NoDiffForPath(
+          path: "src/same.gleam",
+          old_tag: "2.4.1",
+          new_side: WorkingTree,
+        ),
         HunkHeaderNotFound("@@ -1 +1 @@"),
-        DiffLineNotFound(path: diff_path, old_tag: "2.4.1"),
+        DiffLineNotFound(
+          path: diff_path,
+          old_tag: "2.4.1",
+          new_side: WorkingTree,
+        ),
       ]
 
       // Act
@@ -820,8 +1033,8 @@ fn describe_tests() -> UnitNode {
         "the diff block has no diff lines after its file header",
         "the compare link anchor is not the one for src/app.gleam; use #diff-abc",
         "the tag 1.9.9 is not in this clone; fetch the tags with \"git fetch --tags\" (a shallow clone has none)",
-        "cannot read the git diff: git is not on the PATH",
-        "cannot read the git diff: git stopped with exit status 128",
+        "cannot run git: git is not on the PATH",
+        "cannot run git: git stopped with exit status 128",
         "src/same.gleam has no changes since the tag 2.4.1",
         "the hunk header @@ -1 +1 @@ is not a hunk header of the real diff, or it is out of order",
         "this line is not in \"git diff 2.4.1 -- src/app.gleam\" at this place; a diff block shows lines of the real diff, in order and contiguous within a hunk",
@@ -1726,7 +1939,11 @@ fn diff_failing_tests() -> UnitNode {
       report.problems
       |> should
       |> be_equal([
-        Problem("doc.md", 3, NoDiffForPath(path:, old_tag: "2.4.1")),
+        Problem(
+          "doc.md",
+          3,
+          NoDiffForPath(path:, old_tag: "2.4.1", new_side: WorkingTree),
+        ),
       ])
       |> or_fail_with("A file with no changes should fail")
     }),
@@ -1748,7 +1965,11 @@ fn diff_failing_tests() -> UnitNode {
         Problem(
           "doc.md",
           7,
-          DiffLineNotFound(path: diff_path, old_tag: "2.4.1"),
+          DiffLineNotFound(
+            path: diff_path,
+            old_tag: "2.4.1",
+            new_side: WorkingTree,
+          ),
         ),
       ])
       |> or_fail_with("A made-up line should fail at that line")
@@ -1771,7 +1992,11 @@ fn diff_failing_tests() -> UnitNode {
         Problem(
           "doc.md",
           7,
-          DiffLineNotFound(path: diff_path, old_tag: "2.4.1"),
+          DiffLineNotFound(
+            path: diff_path,
+            old_tag: "2.4.1",
+            new_side: WorkingTree,
+          ),
         ),
       ])
       |> or_fail_with("Lines that are not contiguous in one hunk should fail")
@@ -1833,7 +2058,7 @@ fn scope_tests() -> UnitNode {
       // Assert
       version
       |> should
-      |> be_equal(Ok(Version(2, 4, 1)))
+      |> be_equal(Ok(Version(2, 4, 1, [])))
       |> or_fail_with("The version should come from the file name")
     }),
     it("skips release notes before 3.0.0", fn() {
@@ -1845,7 +2070,7 @@ fn scope_tests() -> UnitNode {
 
       // Act
       let checked =
-        list.map(paths, check.is_checked_release_notes(_, Version(3, 0, 0)))
+        list.map(paths, check.is_checked_release_notes(_, Version(3, 0, 0, [])))
 
       // Assert
       checked
@@ -1862,7 +2087,7 @@ fn scope_tests() -> UnitNode {
 
       // Act
       let checked =
-        list.map(paths, check.is_checked_release_notes(_, Version(3, 0, 0)))
+        list.map(paths, check.is_checked_release_notes(_, Version(3, 0, 0, [])))
 
       // Assert
       checked

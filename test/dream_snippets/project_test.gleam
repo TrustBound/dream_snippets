@@ -12,6 +12,7 @@ import dream_test/suite.{type TestSuite}
 import dream_test/unit.{type UnitNode, describe, group, it}
 import fixtures/project
 import gleam/list
+import gleam/result
 import gleam/string
 import simplifile
 
@@ -113,12 +114,45 @@ fn check_project_tests() -> UnitNode {
       |> should
       |> be_equal(Output(
         standard_output: [
-          "2 blocks and 1 diff blocks checked in 7 files, 0 problems",
+          "2 blocks and 1 diff block checked in 7 files, 0 problems",
         ],
         standard_error: [],
         exit_status: 0,
       ))
       |> or_fail_with("Only the files in scope should be checked, and pass")
+    }),
+    it("checks code at an older release against the real git history", fn() {
+      // Arrange
+      let old_code_heading =
+        "### Before <a href=\"https://github.com/me/app/blob/1.0.0/src/app.gleam#L2\"><img align=\"right\" alt=\"Code at 1.0.0\" src=\"https://img.shields.io/badge/%F0%9F%93%9C_code_at-1.0.0-lightgrey.svg?style=flat-square\"></a>"
+      let block = old_code_heading <> "\n\n```gleam\n  \"old\"\n```\n"
+      let assert Ok(directory) =
+        project.write_project("project_old_code", [
+          #("gleam.toml", project_toml),
+          #("README.md", "# App\n\n" <> block),
+          #("docs/guides/upgrading.md", block),
+          #("src/app.gleam", old_app),
+        ])
+      let assert Ok(Nil) = project.commit_and_tag(directory, "1.0.0")
+      let assert Ok(Nil) =
+        simplifile.write(to: directory <> "/src/app.gleam", contents: new_app)
+
+      // Act
+      let result =
+        dream_snippets.output(dream_snippets.check_project(directory))
+
+      // Assert
+      result
+      |> should
+      |> be_equal(Output(
+        standard_output: [
+          "README.md:5: the code at an older release badge is only allowed in the guides under docs/guides and in release notes, because the README, the changelog and doc comments show only code of the current version",
+          "2 blocks and 0 diff blocks checked in 3 files, 1 problem",
+        ],
+        standard_error: [],
+        exit_status: 1,
+      ))
+      |> or_fail_with("The guide block should pass, and the README block fail")
     }),
     it("reports every problem, sorted, and stops with status 1", fn() {
       // Arrange
@@ -140,7 +174,7 @@ fn check_project_tests() -> UnitNode {
         standard_output: [
           "README.md:1: this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)",
           "docs/a.md:2: this line looks like Gleam code in a text code fence; put Gleam code in a gleam block with the tested snippet badge",
-          "1 blocks and 0 diff blocks checked in 2 files, 2 problems",
+          "1 block and 0 diff blocks checked in 2 files, 2 problems",
         ],
         standard_error: [],
         exit_status: 1,
@@ -174,7 +208,7 @@ fn check_project_tests() -> UnitNode {
           standard_output: [
             "releases/release-1.1.0.md:1: the section \"## Testing\" is missing, but the template requires it; see \"Release notes template\" in docs/releasing.md",
             "releases/release-1.1.0.md:17: this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)",
-            "1 blocks and 0 diff blocks checked in 1 files, 2 problems",
+            "1 block and 0 diff blocks checked in 1 file, 2 problems",
           ],
           standard_error: [],
           exit_status: 1,
@@ -182,6 +216,102 @@ fn check_project_tests() -> UnitNode {
         |> or_fail_with(
           "The template problem and the block problem should both be listed",
         )
+      },
+    ),
+    it("checks a release notes file root at checked_from_version", fn() {
+      // Arrange
+      let gleam_toml =
+        project_toml <> "release_notes = [\"notes/release-1.1.0.md\"]\n"
+      let notes = string.replace(release_notes, "## Testing\n\n", "")
+      let written =
+        project.write_project("project_release_notes_file", [
+          #("gleam.toml", gleam_toml),
+          #("notes/release-1.1.0.md", notes),
+        ])
+
+      // Act
+      let result =
+        result.map(written, fn(directory) {
+          dream_snippets.output(dream_snippets.check_project(directory))
+        })
+
+      // Assert
+      result
+      |> should
+      |> be_equal(
+        Ok(Output(
+          standard_output: [
+            "notes/release-1.1.0.md:1: the section \"## Testing\" is missing, but the template requires it; see \"Release notes template\" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
+            "0 blocks and 0 diff blocks checked in 1 file, 1 problem",
+          ],
+          standard_error: [],
+          exit_status: 1,
+        )),
+      )
+      |> or_fail_with("The file root should get the template check")
+    }),
+    it("skips a release notes file root before checked_from_version", fn() {
+      // Arrange
+      let gleam_toml =
+        project_toml <> "release_notes = [\"notes/release-1.0.0.md\"]\n"
+      let written =
+        project.write_project("project_old_release_notes_file", [
+          #("gleam.toml", gleam_toml),
+          #("notes/release-1.0.0.md", "Notes.\n"),
+        ])
+
+      // Act
+      let result =
+        result.map(written, fn(directory) {
+          dream_snippets.output(dream_snippets.check_project(directory))
+        })
+
+      // Assert
+      result
+      |> should
+      |> be_equal(
+        Ok(Output(
+          standard_output: [
+            "0 blocks and 0 diff blocks checked in 0 files, 0 problems",
+          ],
+          standard_error: [],
+          exit_status: 0,
+        )),
+      )
+      |> or_fail_with("The file root of an older version should be skipped")
+    }),
+    it(
+      "reports one problem for a release notes file root with no version in its name",
+      fn() {
+        // Arrange
+        let gleam_toml =
+          project_toml <> "release_notes = [\"notes/latest.md\"]\n"
+        let written =
+          project.write_project("project_misnamed_release_notes_file", [
+            #("gleam.toml", gleam_toml),
+            #("notes/latest.md", "Notes.\n\n```gleam\nx\n```\n"),
+          ])
+
+        // Act
+        let result =
+          result.map(written, fn(directory) {
+            dream_snippets.output(dream_snippets.check_project(directory))
+          })
+
+        // Assert
+        result
+        |> should
+        |> be_equal(
+          Ok(Output(
+            standard_output: [
+              "notes/latest.md:1: a release notes file must be named \"release-<version>.md\", for example \"release-1.2.0.md\"; see \"Release notes template\" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html",
+              "0 blocks and 0 diff blocks checked in 1 file, 1 problem",
+            ],
+            standard_error: [],
+            exit_status: 1,
+          )),
+        )
+        |> or_fail_with("The name should be the only problem")
       },
     ),
     it(
@@ -351,7 +481,7 @@ fn output_tests() -> UnitNode {
       descriptions
       |> should
       |> be_equal([
-        "gleam.toml has no version = \"...\" line before its first [section].",
+        "gleam.toml has no version = \"...\" line before its first [section]",
         "Cannot list docs: Permission denied",
         "Cannot read README.md: Permission denied",
         "GUIDE.md is set in [tools.dream_snippets] in gleam.toml, but it does not exist",

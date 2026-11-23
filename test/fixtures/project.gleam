@@ -46,12 +46,22 @@ fn write_file(
 /// the settings of the user cannot change the result.
 pub fn commit_and_tag(directory: String, tag: String) -> Result(Nil, GitError) {
   let repository = Git(program: "git", directory:)
+  use _output <- result.try(git.run(repository, ["init", "-q", "-b", "main"]))
+  commit_again_and_tag(directory, tag)
+}
+
+/// Adds one more commit of all the files to the git repository that
+/// `commit_and_tag` made, and the tag `tag` on that commit.
+pub fn commit_again_and_tag(
+  directory: String,
+  tag: String,
+) -> Result(Nil, GitError) {
+  let repository = Git(program: "git", directory:)
   let settings = [
     "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgSign=false", "-c",
     "tag.gpgSign=false", "-c", "user.name=Fixture", "-c",
     "user.email=fixture@example.com",
   ]
-  use _output <- result.try(git.run(repository, ["init", "-q", "-b", "main"]))
   use _output <- result.try(git.run(repository, ["add", "-A"]))
   use _output <- result.try(git.run(
     repository,

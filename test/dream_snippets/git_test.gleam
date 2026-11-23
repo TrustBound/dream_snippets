@@ -9,6 +9,7 @@ import dream_test/suite.{type TestSuite}
 import dream_test/unit.{type UnitNode, describe, group, it}
 import fixtures/project
 import gleam/list
+import gleam/option.{None, Some}
 import gleam/result
 import simplifile
 
@@ -17,7 +18,12 @@ const old_text = "pub fn name() {\n  \"old\"\n}\n"
 const new_text = "pub fn name() {\n  \"new\"\n}\n"
 
 pub fn tests() -> TestSuite {
-  describe("dream_snippets/git", [tag_tests(), diff_tests(), describe_tests()])
+  describe("dream_snippets/git", [
+    tag_tests(),
+    diff_tests(),
+    file_at_tag_tests(),
+    describe_tests(),
+  ])
 }
 
 fn tag_tests() -> UnitNode {
@@ -103,6 +109,66 @@ fn diff_tests() -> UnitNode {
       |> should
       |> be_equal(Error(GitFailed(status: 1, output: "")))
       |> or_fail_with("A failed rev-parse should give its status")
+    }),
+  ])
+}
+
+fn file_at_tag_tests() -> UnitNode {
+  group("file_at_tag", [
+    it("returns a file as it was at the tag", fn() {
+      // Arrange
+      let assert Ok(directory) =
+        project.write_project("git_file_at_tag", [#("src/app.gleam", old_text)])
+      let assert Ok(Nil) = project.commit_and_tag(directory, "1.0.0")
+      let assert Ok(Nil) =
+        simplifile.write(to: directory <> "/src/app.gleam", contents: new_text)
+      let repository = Git(program: "git", directory:)
+
+      // Act
+      let found = git.file_at_tag(repository, "1.0.0", "src/app.gleam")
+
+      // Assert
+      found
+      |> should
+      |> be_equal(Ok(Some(old_text)))
+      |> or_fail_with("The text at the tag should be read, not the new text")
+    }),
+    it("returns None for a missing path and for a directory", fn() {
+      // Arrange
+      let assert Ok(directory) =
+        project.write_project("git_file_at_tag_missing", [
+          #("src/app.gleam", old_text),
+        ])
+      let assert Ok(Nil) = project.commit_and_tag(directory, "1.0.0")
+      let repository = Git(program: "git", directory:)
+
+      // Act
+      let found =
+        list.map(["src/other.gleam", "src", "src/app"], git.file_at_tag(
+          repository,
+          "1.0.0",
+          _,
+        ))
+
+      // Assert
+      found
+      |> should
+      |> be_equal([Ok(None), Ok(None), Ok(None)])
+      |> or_fail_with("Only a file at exactly that path should be read")
+    }),
+    it("returns GitNotFound when the program is not on the PATH", fn() {
+      // Arrange
+      let repository =
+        Git(program: "dream-snippets-no-such-program", directory: ".")
+
+      // Act
+      let found = git.file_at_tag(repository, "1.0.0", "src/app.gleam")
+
+      // Assert
+      found
+      |> should
+      |> be_equal(Error(GitNotFound))
+      |> or_fail_with("A missing program should be an error")
     }),
   ])
 }

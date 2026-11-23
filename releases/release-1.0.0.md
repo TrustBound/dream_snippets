@@ -4,7 +4,7 @@
 
 This is the first release of `dream_snippets`. It checks that each code block in the docs of a Gleam project is an exact copy of a snippet file that the project's tests compile and run. A code example in the docs can then not be wrong without a failed check.
 
-It is the snippet check of the Dream repository, moved to its own package, with the same checks and the same messages. Dream and each Dream module use it.
+It is the snippet check of the Dream repository, moved to its own package, with the same checks. Dream and each Dream module use it.
 
 ## Key Highlights
 
@@ -12,6 +12,8 @@ It is the snippet check of the Dream repository, moved to its own package, with 
 - **Byte for byte**: each `gleam` block must equal the snippet file, or the line range of it, that its badge links to
 - **No setup**: the repository and the release tag come from `gleam.toml`
 - **Diff blocks**: a `diff` block is checked against the real `git diff` from a release tag
+- **Code at an older release**: an upgrade guide can show old code, and the check compares it with the file at the old tag
+- **History that stays right**: release notes and changelog sections of an older release are compared with the files at their own tag, so a version bump needs no change to them
 - **Guide badge**: each README example links to the guide section that shows it
 - **Release notes template**: release notes must follow the one template of the Dream repositories
 - **No network access**: the check reads only the files of the project and its git history
@@ -38,10 +40,11 @@ pub fn summary_of(directory: String) -> List(String) {
 ### What It Checks
 
 - Each `gleam` block in Markdown docs and in `///` and `////` doc comments has a heading with the "tested snippet" badge directly above it
-- The badge links to a snippet file in the same repository, at the tag of the `version` in `gleam.toml`
+- The badge links to a snippet file in the same repository, at the tag of the release of the document: its own version for release notes and a changelog section, and the `version` in `gleam.toml` for every other document
 - The block is the same as the linked file, or as the line range in the link
 - No Gleam code hides in a `text` or `bash` fence, or in a fence with no language
-- Each `diff` block is a part of the real diff of that file from an older release tag
+- Each `diff` block is a part of the real diff of that file from an older release tag to the release of the document
+- Each block of code at an older release, in a guide or in release notes, is the same as the linked file or line range at that older tag. The tag is a release before the release of the document, in semver order. The README, the changelog and doc comments have no such block
 - Each example heading in the root README has a guide badge after the tested snippet badge. It links to a heading of a guide under `docs/guides`, at the same tag, and the guide links to the same snippet file
 - A heading outside the README has no guide badge
 - Each checked release notes file follows the release notes template
@@ -49,6 +52,22 @@ pub fn summary_of(directory: String) -> List(String) {
 ### Guide Badge
 
 Each example in the root README links to the guide section that explains it. The heading of the example has the tested snippet badge, then one space and the guide badge. Both images float right, so the guide badge shows to the left of the tested snippet badge. The check makes sure that the link is at the release tag, that the guide file exists under a guide directory, that the anchor is a heading of the guide, and that the guide shows the same snippet. The anchor of a heading follows GitHub's rule, and `check.heading_anchors` gives the anchors of a document.
+
+### Code at an Older Release
+
+An upgrade guide shows old code next to new code. The old code does not compile on the new version, so the check proves it against git. The heading of the block has a "code at an older release" badge that links to a file at an older release tag. The check reads that file with `git show <tag>:<path>`, and the block must be the same as the file or the line range in the link. The [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md) guide shows the exact badge.
+
+### Release Notes and Changelog Sections of Older Releases
+
+Release notes, `releases/release-<version>.md`, and a changelog section, `## [<version>]`, belong to their own release. Their badge links use the tag of that release. While it is the `version` in `gleam.toml`, the check compares their blocks with the working tree. After the next version bump, it compares them with the files at that tag, and their diffs with `git diff <old tag> <tag> -- <path>`. So the docs of each release stay right with no change, and `checked_from_version` is only needed for releases from before the project used tested docs. The tag of an older release must be in the clone.
+
+### Versions in Semver Order
+
+The check orders versions as semver 2.0.0 does. A pre-release comes before its release, so an upgrade guide for `2.0.0` can show code at `2.0.0-rc.1`, and the notes of `2.0.0-rc.1` belong to an older release once `gleam.toml` says `2.0.0`.
+
+### One Line for Each Problem
+
+Each problem and each error is exactly one line. A control character in a file name, a value or a message, such as a line break in a TOML error, shows as `\n`, `\r`, `\t` or `\u{<hex>}`. The summary line uses the singular for a count of 1, as in `1 block and 0 diff blocks checked in 1 file, 1 problem`.
 
 ### Release Notes Template
 
@@ -83,7 +102,7 @@ checked_from_version = \"1.0.0\"
 
 ## Testing
 
-- 182 tests run, 0 failed, 100.0% line coverage (959 of 959 lines), in about 0.6 seconds (Apple M1 Max, OTP 29, Gleam 1.19.2)
+- 369 tests run, 0 failed, 100.0% line coverage (1144 of 1144 lines), in about 6.5 seconds by the test runner (`make test`, Apple M1 Max, OTP 29, Gleam 1.19.2, load average about 6 from other work)
 
 ## Installing
 
@@ -99,7 +118,7 @@ Then run the check from the project root:
 gleam run -m dream_snippets
 ```
 
-The [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md) guide shows the exact headings and badges that a code block needs.
+The [Getting started](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/getting-started.md) guide walks through the first tested snippet, the first failure and the CI step. The [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md) guide shows the exact headings and badges that a code block needs.
 
 ## Documentation
 

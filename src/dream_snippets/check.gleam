@@ -3,8 +3,8 @@
 //// Each ```` ```gleam ```` block in a Markdown doc, and each one in a `///`
 //// or `////` doc comment in `src/`, has a heading directly above it that
 //// ends with the "tested snippet" badge. The badge links to a file in the
-//// GitHub repository of the project, at the tag of the version in
-//// `gleam.toml`, for example
+//// GitHub repository of the project, at the tag of the release of the
+//// document (see "The release of a document" below), for example
 //// `https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/name.gleam#L8-L10`.
 //// The block is that whole file, or exactly that line range, byte for byte.
 //// The tests of the project compile and run the file, so the code in the
@@ -35,19 +35,45 @@
 //// where `<digest>` is the SHA-256 hex digest of the file's path (GitHub's
 //// own anchor for the file). The block starts with the `--- a/<path>` and
 //// `+++ b/<path>` lines, then holds lines of the diff, with or without
-//// `@@` hunk headers. The check runs `git diff <old tag> -- <path>` against
-//// the working tree, and each run of lines must be in that diff, in order
-//// and contiguous within one hunk. The new tag is the version in
-//// `gleam.toml`, because that tag does not exist before the release.
+//// `@@` hunk headers. The new tag is the tag of the release of the
+//// document. For the version in `gleam.toml`, that tag does not exist
+//// before the release, so the check runs `git diff <old tag> -- <path>`
+//// against the working tree. For an older release, it runs
+//// `git diff <old tag> <new tag> -- <path>`. Each run of lines must be in
+//// that diff, in order and contiguous within one hunk.
+////
+//// A guide or release notes can also show code as it was at an older
+//// release, next to the new code. Old code does not compile on the new
+//// version, so it cannot be a tested snippet. It is proven against git
+//// instead. Its heading ends with the "code at an older release" badge,
+//// which links to a file at the older tag, for example
+//// `https://github.com/TrustBound/dream_test/blob/2.1.3/src/dream_test/unit.gleam#L40-L52`.
+//// The tag is a release before the release of the document. The check reads
+//// the file with `git show <tag>:<path>`, and the block is that whole file,
+//// or exactly that line range, byte for byte. The README, the changelog and
+//// doc comments show only code of the current version, so this badge is a
+//// problem there.
 ////
 //// In the root README, the heading of each ```` ```gleam ```` block also
 //// has the guide badge after the tested snippet badge. It links to the
 //// section of a guide that shows the example (see `check_readme`). In
 //// every other document, a heading has no guide badge.
 ////
+//// The release of a document: release notes, `release-<version>.md`, and
+//// a changelog section, `## [<version>]`, belong to their own version.
+//// Every other document, the `## [Unreleased]` section and the text before
+//// the first changelog section belong to the version in `gleam.toml`. The
+//// badge links of a document use the tag of its release. When the release
+//// is the version in `gleam.toml`, its blocks are compared with the working
+//// tree. When it is an older release, they are compared with the files at
+//// its tag, so release notes and changelog sections stay right after a
+//// version bump. Versions are ordered as semver 2.0.0 orders them (see
+//// `compare_versions`).
+////
 //// Release notes and changelog entries are checked from the
-//// `checked_from_version` of the `CheckContext` on. Older ones show code
-//// that was right for their own version, so they are not.
+//// `checked_from_version` of the `CheckContext` on. The ones before it are
+//// skipped, for example the notes of releases from before the project
+//// used tested docs.
 ////
 //// The functions here are pure. They get files and git through a
 //// `CheckContext`, so tests can give them fake files and a fake git
@@ -76,24 +102,58 @@ pub type DocumentKind {
   /// and `////` doc comments is checked.
   GleamSource
   /// A release notes file, `release-<version>.md`. It is checked like a
-  /// Markdown document when its version is `checked_from_version` or later,
-  /// and skipped when it is older or has no version in its name.
+  /// guide of the release `<version>` when that version is
+  /// `checked_from_version` or later, and skipped when it is older. A directory walk skips a file with no
+  /// version in its name. A file that is itself a root and has no version
+  /// in its name gets one problem, `MisnamedReleaseNotes`.
   ReleaseNotes
   /// The changelog. Its `## [<version>]` sections for `checked_from_version`
   /// and later, its `## [Unreleased]` section and the text before the first
-  /// section are checked. The sections of older versions are skipped.
+  /// section are checked. A `## [<version>]` section belongs to the release
+  /// `<version>`. The sections of versions before `checked_from_version`
+  /// are skipped.
   Changelog
 }
 
-/// A release version, `major.minor.patch`.
+/// A release version as semver 2.0.0 writes it: `major.minor.patch`, then
+/// an optional pre-release part after a `-`. `pre_release` is empty for a
+/// release, and holds the identifiers of the pre-release part in order, for
+/// example `[AlphanumericIdentifier("rc"), NumericIdentifier(1)]` for
+/// `3.0.0-rc.1`. See `compare_versions` for the order of versions.
 pub type Version {
-  Version(major: Int, minor: Int, patch: Int)
+  Version(
+    major: Int,
+    minor: Int,
+    patch: Int,
+    pre_release: List(PreReleaseIdentifier),
+  )
+}
+
+/// One dot-separated identifier of the pre-release part of a version.
+pub type PreReleaseIdentifier {
+  /// An identifier of digits only, such as `1` in `rc.1`. It has no
+  /// leading zero.
+  NumericIdentifier(number: Int)
+  /// An identifier with a letter or a `-`, such as `rc` or `beta-2`.
+  AlphanumericIdentifier(text: String)
+}
+
+/// Where the code of a release is read: the tested snippet files that its
+/// docs link to, and the new side of its diff blocks.
+pub type CodeSource {
+  /// The working tree. The docs of the version in `gleam.toml` read it,
+  /// because the tag of that version does not exist before the release.
+  WorkingTree
+  /// The files at the tag of an older release.
+  FilesAtTag(tag: String)
 }
 
 /// The project whose docs are checked, as its `gleam.toml` describes it.
 ///
 /// `name` is the package name, used in the message of a wrong tag. `version`
-/// is the release tag that every badge link must use. `repository` is the
+/// is the release of every document that names no release of its own: the
+/// tag that its badge links must use. Release notes and changelog sections
+/// of an older release use their own tag. `repository` is the
 /// GitHub repository that every badge must link at. `badge_guide` is the
 /// document or address that a malformed badge message tells the reader to
 /// copy the badge from. `release_notes_guide` is the document or address
@@ -155,6 +215,25 @@ const guide_badge_end =
 /// The text that shows that a heading has a guide badge, in any form.
 const guide_badge_marker = " alt=\"" <> guide_badge_alt <> "\""
 
+/// The start of the alt text of the "code at an older release" badge. The
+/// old tag follows it. The badge form is in `old_code_badge_alt_start`,
+/// `old_code_badge_image_start` and `old_code_badge_image_end` only (see
+/// `old_code_badge_end`).
+const old_code_badge_alt_start = "Code at "
+
+/// The start of the image address of the "code at an older release" badge.
+/// The old tag follows it, written as shields.io needs it (see
+/// `shields_text`).
+const old_code_badge_image_start =
+  "https://img.shields.io/badge/%F0%9F%93%9C_code_at-"
+
+/// The end of the image address of the "code at an older release" badge.
+const old_code_badge_image_end = "-lightgrey.svg?style=flat-square"
+
+/// The text that shows that a heading has a "code at an older release"
+/// badge, in any form.
+const old_code_badge_marker = " alt=\"" <> old_code_badge_alt_start
+
 /// The start of the anchor that names one file in a compare view. The
 /// SHA-256 hex digest of the file's path follows it.
 const diff_anchor_prefix = "diff-"
@@ -177,9 +256,16 @@ pub type Line {
 /// `tag_exists` tells whether a git tag is in the local clone.
 /// `diff_from_tag` returns the text of the git diff of one path (the second
 /// argument) from a tag (the first argument) to the working tree.
+/// `diff_between_tags` returns the text of the git diff of one path (the
+/// third argument) from an old tag (the first argument) to a new tag (the
+/// second argument).
+/// `file_at_tag` returns the text of one path (the second argument) as it
+/// was at a tag (the first argument), or `None` when the tag has no file
+/// at that path.
 /// `dream_snippets.check_project` gives them `simplifile.read`,
-/// `git.tag_exists` and `git.diff_from_tag`. Tests can give them lookups in
-/// lists, so that they do not depend on real files or a real history.
+/// `git.tag_exists`, `git.diff_from_tag`, `git.diff_between_tags` and
+/// `git.file_at_tag`. Tests can give them lookups in lists, so that they do
+/// not depend on real files or a real history.
 pub type CheckContext {
   CheckContext(
     project: Project,
@@ -187,6 +273,8 @@ pub type CheckContext {
     read_source: fn(String) -> Result(String, simplifile.FileError),
     tag_exists: fn(String) -> Result(Bool, GitError),
     diff_from_tag: fn(String, String) -> Result(String, GitError),
+    diff_between_tags: fn(String, String, String) -> Result(String, GitError),
+    file_at_tag: fn(String, String) -> Result(Option(String), GitError),
   )
 }
 
@@ -201,8 +289,9 @@ pub type Reason {
   /// The badge links to another repository or host, or out of the
   /// repository.
   ForeignLink(url: String)
-  /// The tag in the badge link is not the release tag of the document (see
-  /// `CheckContext`).
+  /// The tag in the badge link is not the tag of the release of the
+  /// document: the version in `gleam.toml`, or for release notes and a
+  /// changelog section, their own release.
   WrongTag(found: String, expected: String)
   /// The linked file does not exist in this repository.
   MissingFile(path: String)
@@ -231,8 +320,8 @@ pub type Reason {
   /// `<old tag>...<new tag>#diff-<digest>`, or a tag has characters that a
   /// tag name in this repository does not have.
   NotCompareLink(url: String)
-  /// The new tag in the compare link is not the release tag of the document
-  /// (see `CheckContext`).
+  /// The new tag in the compare link is not the tag of the release of the
+  /// document (see `WrongTag`).
   WrongNewTag(found: String, expected: String)
   /// The diff block does not start with `--- a/<path>` and `+++ b/<path>`
   /// for one path, or the path has characters that are not allowed.
@@ -246,13 +335,14 @@ pub type Reason {
   MissingOldTag(tag: String)
   /// git could not be run, or it failed.
   GitUnavailable(error: GitError)
-  /// The file did not change between the old tag and now.
-  NoDiffForPath(path: String, old_tag: String)
+  /// The file did not change between the old tag and `new_side`.
+  NoDiffForPath(path: String, old_tag: String, new_side: CodeSource)
   /// A hunk header in the block is not a hunk header of the real diff, or
   /// it is out of order.
   HunkHeaderNotFound(header: String)
-  /// A line of the block is not in the real diff at that place.
-  DiffLineNotFound(path: String, old_tag: String)
+  /// A line of the block is not in the real diff from the old tag to
+  /// `new_side` at that place.
+  DiffLineNotFound(path: String, old_tag: String, new_side: CodeSource)
   /// The first line of release notes is not `# <Name> <version> Release
   /// Notes`. `found` is the first line, and `version` is the version in the
   /// file name (or `<version>` when the name has none).
@@ -280,6 +370,9 @@ pub type Reason {
   /// A `##` section of release notes does not have a `###` heading that
   /// the template requires in it.
   MissingReleaseNotesSubsection(section: String, subsection: String)
+  /// A file that a `release_notes` setting names is not named
+  /// `release-<version>.md`, so the check cannot read its version.
+  MisnamedReleaseNotes
   /// An example heading in the README has no guide badge after its tested
   /// snippet badge.
   MissingGuideBadge
@@ -309,6 +402,40 @@ pub type Reason {
   /// The guide file has no tested snippet badge that links to `snippet`,
   /// so it does not show the example.
   ExampleNotInGuide(path: String, snippet: String)
+  /// The heading has a "code at an older release" badge, but not in the
+  /// exact form, or the tag in its alt text or image is not the tag of
+  /// its link.
+  MalformedOldCodeBadge
+  /// The heading has a "code at an older release" badge and another badge.
+  OldCodeBadgeWithOtherBadge
+  /// A "code at an older release" badge is in a document that is not a
+  /// guide or release notes. `guides` are the guide directories.
+  OldCodeNotAllowed(guides: List(String))
+  /// The tag or the path of a "code at an older release" link has
+  /// characters that the check does not give to git (see `is_safe_tag` and
+  /// `is_safe_path`).
+  UnsafeOldCodeLink(tag: String, path: String)
+  /// The tag of a "code at an older release" link is not a release before
+  /// `version`, the release of the document (see `WrongTag`).
+  NotAnOlderRelease(tag: String, version: String)
+  /// The tag of a "code at an older release" link has no file at `path`.
+  MissingFileAtTag(path: String, tag: String)
+  /// The block is not the same as the linked file or range at the old tag.
+  /// `first_difference_line` is the line in the document where the first
+  /// difference is.
+  OldCodeDiffers(
+    path: String,
+    anchor: String,
+    tag: String,
+    first_difference_line: Int,
+  )
+  /// Release notes or a changelog section belong to the older release
+  /// `tag`, so their blocks are compared with the files at that tag, but
+  /// the tag is not in the local clone.
+  MissingReleaseTag(tag: String)
+  /// Release notes or a changelog section belong to `release`, which is not
+  /// `version`, the version in `gleam.toml`, and not a release before it.
+  ReleaseNotBeforeVersion(release: String, version: String)
 }
 
 /// One problem: the file, the 1-based line, and why.
@@ -422,6 +549,38 @@ type ScanPlace {
   InsideExample
 }
 
+/// The rules that depend on the kind of document, and the release that
+/// the document, or the changelog section, belongs to.
+type DocumentRules {
+  DocumentRules(
+    guide_badge: GuideBadgeRule,
+    old_code: OldCodeRule,
+    release: DocumentRelease,
+  )
+}
+
+/// The release that the blocks of a document, or of a changelog section,
+/// belong to (see `document_release`). `tag` is the tag that their badge
+/// links use. `code` is where their tested snippets and the new side of
+/// their diffs are read, or why they cannot be read.
+type DocumentRelease {
+  DocumentRelease(tag: String, code: Result(CodeSource, Reason))
+}
+
+/// A section of the changelog: its name, or `None` for the text before the
+/// first section, and its lines, from its heading on.
+type ChangelogSection {
+  ChangelogSection(name: Option(String), lines: List(Line))
+}
+
+/// Whether a document can show code at an older release.
+type OldCodeRule {
+  /// A guide or release notes.
+  OldCodeAllowed
+  /// The README, the changelog, doc comments and other documents.
+  OldCodeForbidden
+}
+
 /// Whether the example headings of a document carry the guide badge.
 type GuideBadgeRule {
   /// The root README: each `gleam` block heading must end with the guide
@@ -445,6 +604,24 @@ type CommentKind {
 /// Tells whether a release notes file is checked: its name is
 /// `release-<version>.md` and the version is `checked_from_version` or
 /// later. Versions are compared as numbers, so `10.0.0` is after `3.0.0`.
+///
+/// ## Examples
+///
+/// ### Pick the release notes to check <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_is_checked_release_notes.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{Version}
+/// import gleam/list
+///
+/// pub fn checked_release_notes() -> List(Bool) {
+///   let checked_from_version = Version(2, 0, 0, [])
+///   // Returns [True, False, False]
+///   list.map(
+///     ["releases/release-10.0.0.md", "releases/release-1.4.0.md", "README.md"],
+///     check.is_checked_release_notes(_, checked_from_version),
+///   )
+/// }
+/// ```
 pub fn is_checked_release_notes(
   path: String,
   checked_from_version: Version,
@@ -456,7 +633,20 @@ pub fn is_checked_release_notes(
 }
 
 /// Reads the version from the name of a release notes file, for example
-/// `Version(3, 0, 0)` from `releases/release-3.0.0.md`.
+/// `Version(3, 0, 0, [])` from `releases/release-3.0.0.md`.
+///
+/// ## Examples
+///
+/// ### Read the version of release notes <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_release_notes_version.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{type Version}
+///
+/// pub fn version_of_release_notes() -> Result(Version, Nil) {
+///   // Returns Ok(Version(major: 3, minor: 0, patch: 0, pre_release: []))
+///   check.release_notes_version("releases/release-3.0.0.md")
+/// }
+/// ```
 pub fn release_notes_version(path: String) -> Result(Version, Nil) {
   use version_text <- result.try(release_notes_version_text(path))
   parse_release_version(version_text)
@@ -472,18 +662,67 @@ fn release_notes_version_text(path: String) -> Result(String, Nil) {
   version_text
 }
 
-/// Reads `major.minor.patch`. A pre-release part after a `-`, such as
-/// `-rc.1`, is ignored, so a pre-release counts as its release.
+/// Reads a semver 2.0.0 version: `major.minor.patch`, then an optional
+/// pre-release part after a `-`, such as `-rc.1`. The numbers have no
+/// leading zero. The pre-release part is one or more identifiers separated
+/// by `.`, each made of letters, digits and `-`, and an identifier of
+/// digits only has no leading zero.
+///
+/// ## Examples
+///
+/// ### Read a pre-release version <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_parse_release_version.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{type Version}
+///
+/// pub fn release_candidate_version() -> Result(Version, Nil) {
+///   // Returns Ok(Version(major: 3, minor: 1, patch: 0, pre_release: [
+///   //   AlphanumericIdentifier("rc"),
+///   //   NumericIdentifier(1),
+///   // ]))
+///   check.parse_release_version("3.1.0-rc.1")
+/// }
+/// ```
 pub fn parse_release_version(text: String) -> Result(Version, Nil) {
-  let core = case string.split_once(text, "-") {
-    Ok(#(core, _pre_release)) -> core
-    Error(Nil) -> text
+  let #(core, pre_release_text) = case string.split_once(text, "-") {
+    Ok(#(core, pre_release_text)) -> #(core, Some(pre_release_text))
+    Error(Nil) -> #(text, None)
   }
+  use pre_release <- result.try(parse_pre_release(pre_release_text))
   case core |> string.split(".") |> list.try_map(parse_version_number) {
-    Ok([major, minor, patch]) -> Ok(Version(major:, minor:, patch:))
+    Ok([major, minor, patch]) ->
+      Ok(Version(major:, minor:, patch:, pre_release:))
     _ -> Error(Nil)
   }
 }
+
+fn parse_pre_release(
+  text: Option(String),
+) -> Result(List(PreReleaseIdentifier), Nil) {
+  case text {
+    None -> Ok([])
+    Some(identifiers) ->
+      identifiers
+      |> string.split(".")
+      |> list.try_map(parse_pre_release_identifier)
+  }
+}
+
+fn parse_pre_release_identifier(
+  text: String,
+) -> Result(PreReleaseIdentifier, Nil) {
+  let is_identifier = text != "" && is_made_of(text, identifier_characters)
+  case is_identifier, is_made_of(text, digit_characters) {
+    False, _ -> Error(Nil)
+    True, True -> parse_version_number(text) |> result.map(NumericIdentifier)
+    True, False -> Ok(AlphanumericIdentifier(text))
+  }
+}
+
+const identifier_characters =
+  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-"
+
+const digit_characters = "0123456789"
 
 fn parse_version_number(text: String) -> Result(Int, Nil) {
   use number <- result.try(int.parse(text))
@@ -493,55 +732,301 @@ fn parse_version_number(text: String) -> Result(Int, Nil) {
   }
 }
 
-/// Compares two versions by major, then minor, then patch number.
+/// Compares two versions in the order of semver 2.0.0 (section 11 of
+/// semver.org): by major, then minor, then patch number. When those are
+/// equal, a pre-release comes before its release. Two pre-releases compare
+/// their identifiers from left to right: numeric identifiers as numbers,
+/// letters in ASCII order, a numeric identifier before an alphanumeric
+/// one, and a shorter list before a longer one that starts with it. This
+/// is the one place where the check orders versions.
+///
+/// ## Examples
+///
+/// ### Compare two versions <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_compare_versions.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{AlphanumericIdentifier, NumericIdentifier, Version}
+/// import gleam/order.{type Order}
+///
+/// pub fn compare_release_candidate() -> Order {
+///   let release_candidate =
+///     Version(2, 0, 0, [AlphanumericIdentifier("rc"), NumericIdentifier(1)])
+///   // Returns order.Lt, because a pre-release comes before its release
+///   check.compare_versions(release_candidate, Version(2, 0, 0, []))
+/// }
+/// ```
 pub fn compare_versions(first: Version, second: Version) -> Order {
   int.compare(first.major, second.major)
   |> order.break_tie(int.compare(first.minor, second.minor))
   |> order.break_tie(int.compare(first.patch, second.patch))
+  |> order.lazy_break_tie(fn() {
+    compare_pre_releases(first.pre_release, second.pre_release)
+  })
+}
+
+/// A release, with no pre-release part, comes after its pre-releases.
+fn compare_pre_releases(
+  first: List(PreReleaseIdentifier),
+  second: List(PreReleaseIdentifier),
+) -> Order {
+  case first, second {
+    [], [] -> order.Eq
+    [], _ -> order.Gt
+    _, [] -> order.Lt
+    _, _ -> compare_identifiers(first, second)
+  }
+}
+
+fn compare_identifiers(
+  first: List(PreReleaseIdentifier),
+  second: List(PreReleaseIdentifier),
+) -> Order {
+  case first, second {
+    [], [] -> order.Eq
+    [], _ -> order.Lt
+    _, [] -> order.Gt
+    [first_identifier, ..first_rest], [second_identifier, ..second_rest] ->
+      compare_identifier(first_identifier, second_identifier)
+      |> order.lazy_break_tie(fn() {
+        compare_identifiers(first_rest, second_rest)
+      })
+  }
+}
+
+fn compare_identifier(
+  first: PreReleaseIdentifier,
+  second: PreReleaseIdentifier,
+) -> Order {
+  case first, second {
+    NumericIdentifier(first_number), NumericIdentifier(second_number) ->
+      int.compare(first_number, second_number)
+    NumericIdentifier(_), AlphanumericIdentifier(_) -> order.Lt
+    AlphanumericIdentifier(_), NumericIdentifier(_) -> order.Gt
+    AlphanumericIdentifier(first_text), AlphanumericIdentifier(second_text) ->
+      string.compare(first_text, second_text)
+  }
+}
+
+/// Tells whether a version text is a release before another version text.
+/// A text that is not a version is not before any version.
+fn is_release_before(release: String, version: String) -> Bool {
+  release_order(release, version) == Ok(order.Lt)
+}
+
+fn release_order(release: String, version: String) -> Result(Order, Nil) {
+  use release_version <- result.try(parse_release_version(release))
+  use project_version <- result.map(parse_release_version(version))
+  compare_versions(release_version, project_version)
+}
+
+/// Decides which release the blocks of a document, or of a changelog
+/// section, belong to, and where their code is read. Every check of a
+/// tested snippet, a diff and a guide badge gets the tag and the code from
+/// here.
+///
+/// `named_version` is the version that the document names for itself: the
+/// version in the name of a release notes file, or in the heading of a
+/// changelog section. A document that names no version (a guide, the
+/// README, doc comments, the `Unreleased` section and the text before the
+/// first changelog section) belongs to the version in `gleam.toml`.
+///
+/// The release of the version in `gleam.toml` reads the working tree. An
+/// older release reads the files at its tag, so its docs stay right after
+/// the next version bump. A missing tag, or a release that is neither the
+/// version nor older, is the reason that the code cannot be read.
+fn document_release(
+  named_version: Option(String),
+  context: CheckContext,
+) -> DocumentRelease {
+  let version = context.project.version
+  case named_version {
+    None -> DocumentRelease(tag: version, code: Ok(WorkingTree))
+    Some(release) ->
+      DocumentRelease(
+        tag: release,
+        code: release_code(release, version, context),
+      )
+  }
+}
+
+fn release_code(
+  release: String,
+  version: String,
+  context: CheckContext,
+) -> Result(CodeSource, Reason) {
+  case release_order(release, version) {
+    Ok(order.Eq) -> Ok(WorkingTree)
+    Ok(order.Lt) -> require_release_tag(release, context)
+    _ -> Error(ReleaseNotBeforeVersion(release:, version:))
+  }
+}
+
+fn require_release_tag(
+  tag: String,
+  context: CheckContext,
+) -> Result(CodeSource, Reason) {
+  case context.tag_exists(tag) {
+    Ok(True) -> Ok(FilesAtTag(tag))
+    Ok(False) -> Error(MissingReleaseTag(tag))
+    Error(error) -> Error(GitUnavailable(error))
+  }
 }
 
 fn is_checked_version(version: Version, checked_from_version: Version) -> Bool {
   compare_versions(version, checked_from_version) != order.Lt
 }
 
-/// Checks the changelog. Its sections start at `## [<name>]` lines. The
-/// sections of versions before `checked_from_version` are left out, and the
-/// rest of the file is checked like a Markdown document. Each line keeps its
-/// line number in the file.
+/// Checks the changelog. Its sections start at `## [<name>]` lines outside
+/// code fences. The sections of versions before `checked_from_version` are
+/// left out. Each other section, and the text before the first section, is
+/// checked like a Markdown document, and each line keeps its line number in
+/// the file.
+///
+/// A section whose name is a version belongs to that release: its badge
+/// links use the tag of that version, and when the version is older than
+/// the one in `gleam.toml`, its blocks are compared with the files at that
+/// tag. So the section of an older release stays right after a version
+/// bump. The `Unreleased` section, a section with another name and the
+/// text before the first section belong to the version in `gleam.toml`.
+///
+/// ## Examples
+///
+/// ### Check a changelog <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_check_changelog.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{
+///   type Report, CheckContext, GitHubRepository, Project, Version,
+/// }
+/// import dream_snippets/git
+/// import simplifile
+///
+/// pub fn check_my_changelog() -> Report {
+///   let project =
+///     Project(
+///       name: "my_app",
+///       version: "1.2.0",
+///       repository: GitHubRepository(owner: "me", name: "my_app"),
+///       badge_guide: "CONTRIBUTING.md",
+///       release_notes_guide: "CONTRIBUTING.md",
+///       guides: ["docs/guides"],
+///     )
+///   let context =
+///     CheckContext(
+///       project:,
+///       checked_from_version: Version(1, 0, 0, []),
+///       read_source: simplifile.read,
+///       tag_exists: fn(_tag) { Error(git.GitNotFound) },
+///       diff_from_tag: fn(_tag, _path) { Error(git.GitNotFound) },
+///       diff_between_tags: fn(_old_tag, _new_tag, _path) {
+///         Error(git.GitNotFound)
+///       },
+///       file_at_tag: fn(_tag, _path) { Error(git.GitNotFound) },
+///     )
+///   let changelog =
+///     "# Changelog\n\n## [Unreleased]\n\n```gleam\nnew_code()\n```\n\n"
+///     <> "## [0.9.0] - 2026-01-10\n\n```gleam\nold_code()\n```\n"
+///   // Returns Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
+///   //   Problem(file: "CHANGELOG.md", line: 5, reason: MissingBadgeHeading),
+///   // ])
+///   check.check_changelog("CHANGELOG.md", changelog, context)
+/// }
+/// ```
 pub fn check_changelog(
   file: String,
   text: String,
   context: CheckContext,
 ) -> Report {
-  let #(_last_checked, marked_lines) =
-    list.map_fold(numbered_lines(text, 1), True, fn(checked, line) {
-      let checked =
-        is_checked_from_line(line.text, checked, context.checked_from_version)
-      #(checked, #(checked, line))
-    })
-  let lines =
-    marked_lines
-    |> list.filter(fn(marked) { marked.0 })
-    |> list.map(fn(marked) { marked.1 })
-  scan(lines, [], TopLevel, GuideBadgeForbidden, file, context, empty_report())
+  numbered_lines(text, 1)
+  |> changelog_sections
+  |> list.filter(fn(section) {
+    is_checked_section(section.name, context.checked_from_version)
+  })
+  |> list.map(fn(section) {
+    let rules =
+      DocumentRules(
+        guide_badge: GuideBadgeForbidden,
+        old_code: OldCodeForbidden,
+        release: document_release(section_version(section.name), context),
+      )
+    scan(section.lines, [], TopLevel, rules, file, context, empty_report())
+  })
+  |> merge_reports
 }
 
-/// Whether a line is in a checked section: a section heading decides it
-/// for the lines that follow, and any other line keeps the decision of the
-/// line before it.
-fn is_checked_from_line(
-  text: String,
-  checked_before: Bool,
+/// Splits the lines of the changelog into its sections. A section starts
+/// at a `## [<name>]` heading outside code fences.
+fn changelog_sections(lines: List(Line)) -> List(ChangelogSection) {
+  let headings =
+    prose_lines(lines, [])
+    |> list.filter_map(fn(line) {
+      changelog_section_name(line.text)
+      |> result.map(fn(name) { #(line.number, name) })
+    })
+  lines
+  |> list.fold([], fn(sections, line) {
+    add_changelog_line(sections, line, list.key_find(headings, line.number))
+  })
+  |> list.map(fn(section) {
+    ChangelogSection(..section, lines: list.reverse(section.lines))
+  })
+  |> list.reverse
+}
+
+/// Adds a line to the sections, which are in reverse order with their
+/// lines in reverse order.
+fn add_changelog_line(
+  sections: List(ChangelogSection),
+  line: Line,
+  heading_name: Result(String, Nil),
+) -> List(ChangelogSection) {
+  case heading_name, sections {
+    Ok(name), _ -> [
+      ChangelogSection(name: Some(name), lines: [line]),
+      ..sections
+    ]
+    Error(Nil), [] -> [ChangelogSection(name: None, lines: [line])]
+    Error(Nil), [section, ..earlier] -> [
+      ChangelogSection(..section, lines: [line, ..section.lines]),
+      ..earlier
+    ]
+  }
+}
+
+fn is_checked_section(
+  name: Option(String),
   checked_from_version: Version,
 ) -> Bool {
-  case changelog_section_name(text) {
-    Ok(name) -> is_checked_changelog_section(name, checked_from_version)
-    Error(Nil) -> checked_before
+  case name {
+    Some(name) -> is_checked_changelog_section(name, checked_from_version)
+    None -> True
   }
+}
+
+/// The version that a changelog section names, or `None` when its name is
+/// not a version.
+fn section_version(name: Option(String)) -> Option(String) {
+  option.then(name, fn(name) {
+    parse_release_version(name)
+    |> result.replace(name)
+    |> option.from_result
+  })
 }
 
 /// Reads the name of a changelog section heading, for example `3.0.0` from
 /// `## [3.0.0] - 2026-11-20`.
+///
+/// ## Examples
+///
+/// ### Read the name of a changelog section <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_changelog_section_name.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check
+///
+/// pub fn section_name() -> Result(String, Nil) {
+///   // Returns Ok("3.0.0")
+///   check.changelog_section_name("## [3.0.0] - 2026-11-20")
+/// }
+/// ```
 pub fn changelog_section_name(text: String) -> Result(String, Nil) {
   use rest <- result.try(remove_prefix(text, "## ["))
   use #(name, _after) <- result.map(string.split_once(rest, "]"))
@@ -550,6 +1035,24 @@ pub fn changelog_section_name(text: String) -> Result(String, Nil) {
 
 /// Tells whether a changelog section is checked: `Unreleased`, a version
 /// from `checked_from_version` on, or a name that is not a version.
+///
+/// ## Examples
+///
+/// ### Pick the changelog sections to check <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_is_checked_changelog_section.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{Version}
+/// import gleam/list
+///
+/// pub fn checked_sections() -> List(Bool) {
+///   let checked_from_version = Version(1, 0, 0, [])
+///   // Returns [True, False, True]
+///   list.map(["Unreleased", "0.9.0", "1.2.0"], check.is_checked_changelog_section(
+///     _,
+///     checked_from_version,
+///   ))
+/// }
+/// ```
 pub fn is_checked_changelog_section(
   name: String,
   checked_from_version: Version,
@@ -683,6 +1186,40 @@ type TemplateScan {
 /// Each problem, sorted by line, with the line where it is, or line 1 for
 /// a missing title, release date or section. A missing `###` heading is at the line of its
 /// `##` section. An empty list when the release notes follow the template.
+///
+/// ## Examples
+///
+/// ### Find a missing section <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_check_release_notes_template.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{type Problem}
+///
+/// pub fn check_my_release_notes() -> List(Problem) {
+///   let release_notes =
+///     "# My App 1.2.0 Release Notes
+///
+/// **Release Date:** 2026-11-20
+///
+/// ## Key Highlights
+///
+/// ## What's New
+///
+/// ## Testing
+///
+/// ## Installing
+///
+/// ## Documentation
+/// "
+///   // Returns [
+///   //   Problem(
+///   //     file: "releases/release-1.2.0.md",
+///   //     line: 1,
+///   //     reason: MissingReleaseNotesSection("Community"),
+///   //   ),
+///   // ]
+///   check.check_release_notes_template("releases/release-1.2.0.md", release_notes)
+/// }
+/// ```
 pub fn check_release_notes_template(
   file: String,
   text: String,
@@ -943,6 +1480,29 @@ fn required_subsections(name: String) -> List(String) {
 
 /// Sorts problems by file, then by line. Problems on the same line keep
 /// their order.
+///
+/// ## Examples
+///
+/// ### Sort problems by file and line <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_sort_problems.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{
+///   type Problem, MissingBadgeHeading, MissingReleaseDate, Problem, UnclosedFence,
+/// }
+///
+/// pub fn sorted_problems() -> List(Problem) {
+///   // Returns [
+///   //   Problem("CHANGELOG.md", 4, UnclosedFence),
+///   //   Problem("README.md", 2, MissingReleaseDate),
+///   //   Problem("README.md", 9, MissingBadgeHeading),
+///   // ]
+///   check.sort_problems([
+///     Problem("README.md", 9, MissingBadgeHeading),
+///     Problem("CHANGELOG.md", 4, UnclosedFence),
+///     Problem("README.md", 2, MissingReleaseDate),
+///   ])
+/// }
+/// ```
 pub fn sort_problems(problems: List(Problem)) -> List(Problem) {
   list.sort(problems, compare_problems)
 }
@@ -955,46 +1515,208 @@ fn compare_problems(first: Problem, second: Problem) -> Order {
 }
 
 /// The last line of the output, for example
-/// `412 blocks and 5 diff blocks checked in 230 files, 0 problems`.
+/// `412 blocks and 5 diff blocks checked in 230 files, 0 problems`. A count
+/// of 1 takes the singular, as in `1 block`.
+///
+/// ## Examples
+///
+/// ### Write the summary line <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_summary.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check
+///
+/// pub fn summary_line() -> String {
+///   // Returns "12 blocks and 2 diff blocks checked in 9 files, 1 problem"
+///   check.summary(12, 2, 9, 1)
+/// }
+/// ```
 pub fn summary(
   blocks: Int,
   diff_blocks: Int,
   files: Int,
   problems: Int,
 ) -> String {
-  int.to_string(blocks)
-  <> " blocks and "
-  <> int.to_string(diff_blocks)
-  <> " diff blocks checked in "
-  <> int.to_string(files)
-  <> " files, "
-  <> int.to_string(problems)
-  <> " problems"
+  counted(blocks, "block")
+  <> " and "
+  <> counted(diff_blocks, "diff block")
+  <> " checked in "
+  <> counted(files, "file")
+  <> ", "
+  <> counted(problems, "problem")
 }
 
-/// Describes a problem in one line, as `file:line: reason`.
+/// A number and a noun, in the singular for 1 and in the plural (with an
+/// `s`) for every other number.
+fn counted(number: Int, noun: String) -> String {
+  let plural_end = case number {
+    1 -> ""
+    _ -> "s"
+  }
+  int.to_string(number) <> " " <> noun <> plural_end
+}
+
+/// Describes a problem in one line, as `file:line: reason`. A control
+/// character in the file name or the reason is shown in a visible form
+/// (see `one_line`).
+///
+/// ## Examples
+///
+/// ### Describe a problem in one line <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_describe_problem.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{GitHubRepository, Problem, Project, UnclosedFence}
+///
+/// pub fn problem_line() -> String {
+///   let project =
+///     Project(
+///       name: "my_app",
+///       version: "1.2.0",
+///       repository: GitHubRepository(owner: "me", name: "my_app"),
+///       badge_guide: "CONTRIBUTING.md",
+///       release_notes_guide: "CONTRIBUTING.md",
+///       guides: ["docs/guides"],
+///     )
+///   // Returns "README.md:14: this code fence has no closing fence"
+///   check.describe_problem(Problem("README.md", 14, UnclosedFence), project)
+/// }
+/// ```
 pub fn describe_problem(problem: Problem, project: Project) -> String {
-  problem.file
-  <> ":"
-  <> int.to_string(problem.line)
-  <> ": "
-  <> describe_reason(problem.reason, project)
+  one_line(
+    problem.file
+    <> ":"
+    <> int.to_string(problem.line)
+    <> ": "
+    <> reason_text(problem.reason, project),
+  )
+}
+
+/// Writes each control character of a text in a visible form, so that a
+/// message is exactly one line: a line feed as `\n`, a carriage return as
+/// `\r`, a tab as `\t`, and any other control character (U+0000 to
+/// U+001F, U+007F to U+009F) as `\u{<hex>}`. Every message of the check
+/// passes through this function: `describe_problem`, `describe_reason`,
+/// `config.describe_error` and `dream_snippets.describe_error` return their
+/// text through it. A text with no control character is returned as it is,
+/// so a second pass changes nothing.
+///
+/// ## Examples
+///
+/// ### Keep a message on one line <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_one_line.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check
+///
+/// pub fn visible_line_break() -> String {
+///   // Returns "found \\n where \" was expected", with a backslash and an n in
+///   // place of the line break
+///   check.one_line("found \n where \" was expected")
+/// }
+/// ```
+pub fn one_line(text: String) -> String {
+  text
+  |> string.to_utf_codepoints
+  |> list.map(visible_codepoint)
+  |> string.concat
+}
+
+fn visible_codepoint(codepoint: UtfCodepoint) -> String {
+  case string.utf_codepoint_to_int(codepoint) {
+    0x0A -> "\\n"
+    0x0D -> "\\r"
+    0x09 -> "\\t"
+    number if number < 0x20 || number >= 0x7F && number < 0xA0 ->
+      "\\u{" <> int.to_base16(number) <> "}"
+    _ -> string.from_utf_codepoints([codepoint])
+  }
 }
 
 /// The end of the message of a wrong tag: where the expected tag comes
-/// from.
-fn tag_rule(project: Project) -> String {
-  " (the docs of " <> project.name <> " use the version in gleam.toml)"
+/// from. The docs of the version in `gleam.toml` link at that version.
+/// Release notes and changelog sections of an older release link at their
+/// own release, which is never the version in `gleam.toml`.
+fn tag_rule(expected: String, project: Project) -> String {
+  case expected == project.version {
+    True ->
+      " (the docs of " <> project.name <> " use the version in gleam.toml)"
+    False ->
+      " (release notes and changelog sections link at the tag of their own release)"
+  }
+}
+
+/// Names the release that code at an older release must come before.
+fn release_name(release: String, project: Project) -> String {
+  case release == project.version {
+    True -> ", the version in gleam.toml"
+    False -> ", the release of these release notes"
+  }
+}
+
+/// The text of the `git diff` command of a diff block: from the old tag to
+/// the working tree, or to the tag of an older release.
+fn diff_command(path: String, old_tag: String, new_side: CodeSource) -> String {
+  let new_tag = case new_side {
+    WorkingTree -> ""
+    FilesAtTag(tag:) -> " " <> tag
+  }
+  "git diff " <> old_tag <> new_tag <> " -- " <> path
+}
+
+fn no_diff_text(path: String, old_tag: String, new_side: CodeSource) -> String {
+  case new_side {
+    WorkingTree -> path <> " has no changes since the tag " <> old_tag
+    FilesAtTag(tag:) ->
+      path <> " has no changes between the tags " <> old_tag <> " and " <> tag
+  }
 }
 
 /// The address of the GitHub repository of a project, for example
 /// `https://github.com/TrustBound/dream`.
+///
+/// ## Examples
+///
+/// ### Get the address of a repository <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_repository_url.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{GitHubRepository}
+///
+/// pub fn dream_url() -> String {
+///   // Returns "https://github.com/TrustBound/dream"
+///   check.repository_url(GitHubRepository(owner: "TrustBound", name: "dream"))
+/// }
+/// ```
 pub fn repository_url(repository: GitHubRepository) -> String {
   "https://github.com/" <> repository.owner <> "/" <> repository.name
 }
 
 /// Describes why a code block fails the check.
+///
+/// ## Examples
+///
+/// ### Describe why a block fails <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_describe_reason.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{GitHubRepository, Project, WrongTag}
+///
+/// pub fn wrong_tag_reason() -> String {
+///   let project =
+///     Project(
+///       name: "my_app",
+///       version: "1.2.0",
+///       repository: GitHubRepository(owner: "me", name: "my_app"),
+///       badge_guide: "CONTRIBUTING.md",
+///       release_notes_guide: "CONTRIBUTING.md",
+///       guides: ["docs/guides"],
+///     )
+///   // Returns "the badge link uses the tag 1.1.0, but this file must link at the
+///   // tag 1.2.0 (the docs of my_app use the version in gleam.toml)"
+///   check.describe_reason(WrongTag(found: "1.1.0", expected: "1.2.0"), project)
+/// }
+/// ```
 pub fn describe_reason(reason: Reason, project: Project) -> String {
+  one_line(reason_text(reason, project))
+}
+
+fn reason_text(reason: Reason, project: Project) -> String {
   case reason {
     MissingBadgeHeading ->
       "this gleam code block has no heading with the tested snippet badge directly above it (one blank line between is allowed)"
@@ -1013,7 +1735,7 @@ pub fn describe_reason(reason: Reason, project: Project) -> String {
       <> found
       <> ", but this file must link at the tag "
       <> expected
-      <> tag_rule(project)
+      <> tag_rule(expected, project)
     MissingFile(path:) ->
       "the badge links to "
       <> path
@@ -1060,7 +1782,7 @@ pub fn describe_reason(reason: Reason, project: Project) -> String {
       <> found
       <> ", but this file must use the new tag "
       <> expected
-      <> tag_rule(project)
+      <> tag_rule(expected, project)
     MissingDiffFileHeader ->
       "the diff block does not start with \"--- a/<path>\" and \"+++ b/<path>\" for one path of letters, digits and . _ - /"
     EmptyDiffBlock -> "the diff block has no diff lines after its file header"
@@ -1073,19 +1795,16 @@ pub fn describe_reason(reason: Reason, project: Project) -> String {
       "the tag "
       <> tag
       <> " is not in this clone; fetch the tags with \"git fetch --tags\" (a shallow clone has none)"
-    GitUnavailable(error:) ->
-      "cannot read the git diff: " <> git.describe_error(error)
-    NoDiffForPath(path:, old_tag:) ->
-      path <> " has no changes since the tag " <> old_tag
+    GitUnavailable(error:) -> "cannot run git: " <> git.describe_error(error)
+    NoDiffForPath(path:, old_tag:, new_side:) ->
+      no_diff_text(path, old_tag, new_side)
     HunkHeaderNotFound(header:) ->
       "the hunk header "
       <> header
       <> " is not a hunk header of the real diff, or it is out of order"
-    DiffLineNotFound(path:, old_tag:) ->
-      "this line is not in \"git diff "
-      <> old_tag
-      <> " -- "
-      <> path
+    DiffLineNotFound(path:, old_tag:, new_side:) ->
+      "this line is not in \""
+      <> diff_command(path, old_tag, new_side)
       <> "\" at this place; a diff block shows lines of the real diff, in order and contiguous within a hunk"
     ReleaseNotesTitleMismatch(found:, version:) ->
       "the first line is \""
@@ -1133,6 +1852,9 @@ pub fn describe_reason(reason: Reason, project: Project) -> String {
       <> sections |> list.map(quoted_section) |> string.join(" nor ")
       <> " is in the file, but the template requires one of them"
       <> template_pointer(project)
+    MisnamedReleaseNotes ->
+      "a release notes file must be named \"release-<version>.md\", for example \"release-1.2.0.md\""
+      <> template_pointer(project)
     MissingReleaseNotesSubsection(section:, subsection:) ->
       quoted_section(section)
       <> " has no \"### "
@@ -1157,7 +1879,7 @@ pub fn describe_reason(reason: Reason, project: Project) -> String {
       <> found
       <> ", but this file must link at the tag "
       <> expected
-      <> tag_rule(project)
+      <> tag_rule(expected, project)
     NotAGuidePath(path:, guides:) ->
       "the guide badge links to "
       <> path
@@ -1182,6 +1904,53 @@ pub fn describe_reason(reason: Reason, project: Project) -> String {
       <> " has no tested snippet badge that links to "
       <> snippet
       <> ", but the guide of a README example must show that example"
+    MalformedOldCodeBadge ->
+      "the code at an older release badge is not in the exact format, or the tag in its alt text or image is not the tag of its link; copy it from "
+      <> project.badge_guide
+    OldCodeBadgeWithOtherBadge ->
+      "this heading has the code at an older release badge and another badge, but a heading with that badge has no other badge"
+    OldCodeNotAllowed(guides:) ->
+      "the code at an older release badge is only allowed in the guides under "
+      <> string.join(guides, " or ")
+      <> " and in release notes, because the README, the changelog and doc comments show only code of the current version"
+    UnsafeOldCodeLink(tag:, path:) ->
+      "the tag "
+      <> tag
+      <> " or the path "
+      <> path
+      <> " has characters that the check does not give to git (a tag has only letters, digits and . _ -, and a path also /)"
+    NotAnOlderRelease(tag:, version:) ->
+      "the tag "
+      <> tag
+      <> " is not a release before "
+      <> version
+      <> release_name(version, project)
+      <> ", so use the tested snippet badge for this code"
+    MissingFileAtTag(path:, tag:) ->
+      "the badge links to "
+      <> path
+      <> ", which is not a file at the tag "
+      <> tag
+    OldCodeDiffers(path:, anchor:, tag:, first_difference_line:) ->
+      "the code block is not the same as "
+      <> path
+      <> anchor
+      <> " at the tag "
+      <> tag
+      <> "; the first difference is at line "
+      <> int.to_string(first_difference_line)
+    MissingReleaseTag(tag:) ->
+      "this block is in the docs of the release "
+      <> tag
+      <> ", so it is compared with the files at the tag "
+      <> tag
+      <> ", but that tag is not in this clone; fetch the tags with \"git fetch --tags\" (a shallow clone has none)"
+    ReleaseNotBeforeVersion(release:, version:) ->
+      "this block is in the docs of the release "
+      <> release
+      <> ", which is neither "
+      <> version
+      <> ", the version in gleam.toml, nor a release before it; set the version in gleam.toml to the release that these docs are for"
   }
 }
 
@@ -1222,7 +1991,10 @@ fn problems_report(problems: List(Problem)) -> Report {
 // Documents
 // ---------------------------------------------------------------------------
 
-/// Checks every fenced code block in a Markdown document.
+/// Checks every fenced code block in a Markdown document. A document under
+/// one of the `guides` directories of the project can show code at an
+/// older release (see `parse_old_code_heading`). In any other document, that
+/// badge is a problem.
 ///
 /// ## Parameters
 ///
@@ -1259,10 +2031,14 @@ fn problems_report(problems: List(Problem)) -> Report {
 ///   let context =
 ///     CheckContext(
 ///       project:,
-///       checked_from_version: Version(1, 0, 0),
+///       checked_from_version: Version(1, 0, 0, []),
 ///       read_source: simplifile.read,
 ///       tag_exists: fn(_tag) { Error(git.GitNotFound) },
 ///       diff_from_tag: fn(_tag, _path) { Error(git.GitNotFound) },
+///       diff_between_tags: fn(_old_tag, _new_tag, _path) {
+///         Error(git.GitNotFound)
+///       },
+///       file_at_tag: fn(_tag, _path) { Error(git.GitNotFound) },
 ///     )
 ///   check.check_markdown("docs/guide.md", guide, context)
 /// }
@@ -1272,11 +2048,21 @@ pub fn check_markdown(
   text: String,
   context: CheckContext,
 ) -> Report {
+  let old_code = case is_guide_path(file, context.project.guides) {
+    True -> OldCodeAllowed
+    False -> OldCodeForbidden
+  }
+  let rules =
+    DocumentRules(
+      guide_badge: GuideBadgeForbidden,
+      old_code:,
+      release: document_release(None, context),
+    )
   scan(
     numbered_lines(text, 1),
     [],
     TopLevel,
-    GuideBadgeForbidden,
+    rules,
     file,
     context,
     empty_report(),
@@ -1302,19 +2088,161 @@ pub fn check_markdown(
 /// the example. The guide badge is checked when the tested snippet badge
 /// is a link of the repository. Its problems are at the line of the
 /// heading. A `diff` block heading has no guide badge.
+///
+/// ## Examples
+///
+/// ### Find a missing guide badge <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_check_readme.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{
+///   type Report, CheckContext, GitHubRepository, Project, Version,
+/// }
+/// import dream_snippets/git
+///
+/// pub fn check_my_readme() -> Report {
+///   let project =
+///     Project(
+///       name: "my_app",
+///       version: "1.2.0",
+///       repository: GitHubRepository(owner: "me", name: "my_app"),
+///       badge_guide: "CONTRIBUTING.md",
+///       release_notes_guide: "CONTRIBUTING.md",
+///       guides: ["docs/guides"],
+///     )
+///   let context =
+///     CheckContext(
+///       project:,
+///       checked_from_version: Version(1, 0, 0, []),
+///       read_source: fn(_path) { Ok("pub const answer = 42\n") },
+///       tag_exists: fn(_tag) { Error(git.GitNotFound) },
+///       diff_from_tag: fn(_tag, _path) { Error(git.GitNotFound) },
+///       diff_between_tags: fn(_old_tag, _new_tag, _path) {
+///         Error(git.GitNotFound)
+///       },
+///       file_at_tag: fn(_tag, _path) { Error(git.GitNotFound) },
+///     )
+///   let heading =
+///     "### The answer <a href=\"https://github.com/me/my_app/blob/1.2.0/test/snippets/answer.gleam\"><img align=\"right\" alt=\"Tested snippet\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square\"></a>"
+///   let readme =
+///     "# My app\n\n" <> heading <> "\n\n```gleam\npub const answer = 42\n```\n"
+///   // Returns Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
+///   //   Problem(file: "README.md", line: 3, reason: MissingGuideBadge),
+///   // ])
+///   check.check_readme("README.md", readme, context)
+/// }
+/// ```
 pub fn check_readme(
   file: String,
   text: String,
   context: CheckContext,
 ) -> Report {
+  let rules =
+    DocumentRules(
+      guide_badge: GuideBadgeRequired,
+      old_code: OldCodeForbidden,
+      release: document_release(None, context),
+    )
   scan(
     numbered_lines(text, 1),
     [],
     TopLevel,
-    GuideBadgeRequired,
+    rules,
     file,
     context,
     empty_report(),
+  )
+}
+
+/// Checks release notes: every fenced code block, as `check_markdown`
+/// does for a guide, so the notes can show code at an older release (see
+/// `parse_old_code_heading`), and the release notes template (see
+/// `check_release_notes_template`). The problems of the template come after
+/// the problems of the code blocks.
+///
+/// The blocks belong to the release in the file name, for example `1.1.0`
+/// for `releases/release-1.1.0.md`. Their badge links use that tag. When
+/// it is the version in `gleam.toml`, the blocks are compared with the
+/// working tree. When it is an older release, they are compared with the
+/// files at its tag, and a diff ends at its tag. A file name with no
+/// version belongs to the version in `gleam.toml`.
+///
+/// ## Examples
+///
+/// ### Check release notes <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_check_release_notes.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{
+///   type Report, CheckContext, GitHubRepository, Project, Version,
+/// }
+/// import gleam/option.{Some}
+///
+/// pub fn check_my_release_notes() -> Report {
+///   let project =
+///     Project(
+///       name: "my_app",
+///       version: "1.2.0",
+///       repository: GitHubRepository(owner: "me", name: "my_app"),
+///       badge_guide: "CONTRIBUTING.md",
+///       release_notes_guide: "CONTRIBUTING.md",
+///       guides: ["docs/guides"],
+///     )
+///   let context =
+///     CheckContext(
+///       project:,
+///       checked_from_version: Version(1, 0, 0, []),
+///       read_source: fn(_path) { Ok("") },
+///       tag_exists: fn(tag) { Ok(tag == "1.1.0") },
+///       diff_from_tag: fn(_tag, _path) { Ok("") },
+///       diff_between_tags: fn(_old_tag, _new_tag, _path) { Ok("") },
+///       file_at_tag: fn(_tag, _path) { Ok(Some("pub const answer = 41\n")) },
+///     )
+///   let heading =
+///     "### The answer in 1.1 <a href=\"https://github.com/me/my_app/blob/1.1.0/src/app.gleam\"><img align=\"right\" alt=\"Code at 1.1.0\" src=\"https://img.shields.io/badge/%F0%9F%93%9C_code_at-1.1.0-lightgrey.svg?style=flat-square\"></a>"
+///   let notes =
+///     "# my_app 1.2.0 Release Notes\n\n**Release Date:** 2026-11-20\n\n"
+///     <> heading
+///     <> "\n\n```gleam\npub const answer = 41\n```\n"
+///   // The old code block passes. The notes have no sections, so it returns
+///   // Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
+///   //   Problem(file, 1, MissingReleaseNotesSection("Key Highlights")),
+///   //   Problem(file, 1, MissingReleaseNotesSection("What's New")),
+///   //   Problem(file, 1, MissingReleaseNotesSection("Testing")),
+///   //   Problem(file, 1, MissingReleaseNotesChoice(["Upgrading", "Installing"])),
+///   //   Problem(file, 1, MissingReleaseNotesSection("Documentation")),
+///   //   Problem(file, 1, MissingReleaseNotesSection("Community")),
+///   // ])
+///   // where file is "releases/release-1.2.0.md"
+///   check.check_release_notes("releases/release-1.2.0.md", notes, context)
+/// }
+/// ```
+pub fn check_release_notes(
+  file: String,
+  text: String,
+  context: CheckContext,
+) -> Report {
+  let named_version = option.from_result(release_notes_version_text(file))
+  let rules =
+    DocumentRules(
+      guide_badge: GuideBadgeForbidden,
+      old_code: OldCodeAllowed,
+      release: document_release(named_version, context),
+    )
+  let report =
+    scan(
+      numbered_lines(text, 1),
+      [],
+      TopLevel,
+      rules,
+      file,
+      context,
+      empty_report(),
+    )
+  Report(
+    ..report,
+    problems: list.append(
+      report.problems,
+      check_release_notes_template(file, text),
+    ),
   )
 }
 
@@ -1326,6 +2254,56 @@ pub fn check_readme(
 /// blank comment line) is removed, and each line keeps its line number in
 /// the file. Leading spaces before the prefix are allowed, so indented doc
 /// comments are checked too.
+///
+/// ## Examples
+///
+/// ### Check the doc comments of a source file <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_check_gleam_source.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{
+///   type Report, CheckContext, GitHubRepository, Project, Version,
+/// }
+/// import dream_snippets/git
+/// import simplifile
+///
+/// pub fn check_my_source() -> Report {
+///   let project =
+///     Project(
+///       name: "my_app",
+///       version: "1.2.0",
+///       repository: GitHubRepository(owner: "me", name: "my_app"),
+///       badge_guide: "CONTRIBUTING.md",
+///       release_notes_guide: "CONTRIBUTING.md",
+///       guides: ["docs/guides"],
+///     )
+///   let context =
+///     CheckContext(
+///       project:,
+///       checked_from_version: Version(1, 0, 0, []),
+///       read_source: simplifile.read,
+///       tag_exists: fn(_tag) { Error(git.GitNotFound) },
+///       diff_from_tag: fn(_tag, _path) { Error(git.GitNotFound) },
+///       diff_between_tags: fn(_old_tag, _new_tag, _path) {
+///         Error(git.GitNotFound)
+///       },
+///       file_at_tag: fn(_tag, _path) { Error(git.GitNotFound) },
+///     )
+///   let source =
+///     "/// Says hello.
+/// ///
+/// /// ```gleam
+/// /// hello()
+/// /// ```
+/// pub fn hello() -> Nil {
+///   Nil
+/// }
+/// "
+///   // Returns Report(blocks_checked: 1, diff_blocks_checked: 0, problems: [
+///   //   Problem(file: "src/app.gleam", line: 3, reason: MissingBadgeHeading),
+///   // ])
+///   check.check_gleam_source("src/app.gleam", source, context)
+/// }
+/// ```
 pub fn check_gleam_source(
   file: String,
   text: String,
@@ -1336,7 +2314,13 @@ pub fn check_gleam_source(
   |> list.chunk(by: fn(classified) { classified.0 })
   |> list.filter_map(comment_run)
   |> list.map(fn(run) {
-    scan(run, [], TopLevel, GuideBadgeForbidden, file, context, empty_report())
+    let rules =
+      DocumentRules(
+        guide_badge: GuideBadgeForbidden,
+        old_code: OldCodeForbidden,
+        release: document_release(None, context),
+      )
+    scan(run, [], TopLevel, rules, file, context, empty_report())
   })
   |> merge_reports
 }
@@ -1395,7 +2379,7 @@ fn scan(
   remaining: List(Line),
   above: List(Line),
   place: ScanPlace,
-  rule: GuideBadgeRule,
+  rules: DocumentRules,
   file: String,
   context: CheckContext,
   report: Report,
@@ -1403,7 +2387,7 @@ fn scan(
   case remaining {
     [] -> report
     [line, ..rest] ->
-      scan_line(line, rest, above, place, rule, file, context, report)
+      scan_line(line, rest, above, place, rules, file, context, report)
   }
 }
 
@@ -1412,7 +2396,7 @@ fn scan_line(
   rest: List(Line),
   above: List(Line),
   place: ScanPlace,
-  rule: GuideBadgeRule,
+  rules: DocumentRules,
   file: String,
   context: CheckContext,
   report: Report,
@@ -1420,7 +2404,7 @@ fn scan_line(
   case parse_fence_opener(line.text) {
     None -> {
       let report = add_report(report, check_prose_line(line, place, file))
-      scan(rest, [line, ..above], place, rule, file, context, report)
+      scan(rest, [line, ..above], place, rules, file, context, report)
     }
     Some(opener) -> {
       let #(raw_content, closing, after) = split_fence(opener, rest, [])
@@ -1440,7 +2424,7 @@ fn scan_line(
       let report =
         add_report(
           report,
-          check_block(block, above, after, rule, file, context),
+          check_block(block, above, after, rules, file, context),
         )
       let above =
         list.flatten([
@@ -1449,7 +2433,7 @@ fn scan_line(
           [line],
           above,
         ])
-      scan(after, above, place, rule, file, context, report)
+      scan(after, above, place, rules, file, context, report)
     }
   }
 }
@@ -1566,7 +2550,7 @@ fn check_block(
   block: FencedBlock,
   above: List(Line),
   after: List(Line),
-  rule: GuideBadgeRule,
+  rules: DocumentRules,
   file: String,
   context: CheckContext,
 ) -> Report {
@@ -1579,20 +2563,20 @@ fn check_block(
       Report(
         blocks_checked: 1,
         diff_blocks_checked: 0,
-        problems: check_gleam_block(block, above, after, rule, file, context),
+        problems: check_gleam_block(block, above, after, rules, file, context),
       )
     "diff" ->
       Report(
         blocks_checked: 0,
         diff_blocks_checked: 1,
-        problems: check_diff_block(block, above, file, context),
+        problems: check_diff_block(block, above, rules.release, file, context),
       )
     "markdown" | "md" ->
       scan(
         block.content,
         [],
         InsideExample,
-        rule,
+        rules,
         file,
         context,
         empty_report(),
@@ -1619,7 +2603,7 @@ fn check_gleam_block(
   block: FencedBlock,
   above: List(Line),
   after: List(Line),
-  rule: GuideBadgeRule,
+  rules: DocumentRules,
   file: String,
   context: CheckContext,
 ) -> List(Problem) {
@@ -1630,7 +2614,7 @@ fn check_gleam_block(
     old_tested_source_line(first_line_skipping_one_blank(after), file)
   let heading_problems = case first_line_skipping_one_blank(above) {
     None -> [at_block(MissingBadgeHeading)]
-    Some(line) -> check_heading(line, block, rule, file, context)
+    Some(line) -> check_heading(line, block, rules, file, context)
   }
   list.append(heading_problems, old_line_below)
 }
@@ -1672,13 +2656,22 @@ fn old_tested_source_line(line: Option(Line), file: String) -> List(Problem) {
 fn check_heading(
   heading: Line,
   block: FencedBlock,
-  rule: GuideBadgeRule,
+  rules: DocumentRules,
   file: String,
   context: CheckContext,
 ) -> List(Problem) {
-  case is_old_tested_source_line(heading.text) {
-    True -> [Problem(file:, line: heading.number, reason: OldTestedSourceLine)]
-    False -> example_heading_problems(heading, block, rule, file, context)
+  let is_old_code = string.contains(heading.text, old_code_badge_marker)
+  case is_old_tested_source_line(heading.text), is_old_code {
+    True, _ -> [
+      Problem(file:, line: heading.number, reason: OldTestedSourceLine),
+    ]
+    False, True ->
+      old_code_reasons(heading, block, rules, context)
+      |> list.map(fn(reason) {
+        Problem(file:, line: block.opening_line, reason:)
+      })
+    False, False ->
+      example_heading_problems(heading, block, rules, file, context)
   }
 }
 
@@ -1688,7 +2681,7 @@ fn check_heading(
 fn example_heading_problems(
   heading: Line,
   block: FencedBlock,
-  rule: GuideBadgeRule,
+  rules: DocumentRules,
   file: String,
   context: CheckContext,
 ) -> List(Problem) {
@@ -1703,9 +2696,12 @@ fn example_heading_problems(
     Error(reason) -> [at_line(block.opening_line)(reason)]
     Ok(#(example, link)) ->
       list.append(
-        list.map(check_link(link, block, context), at_line(block.opening_line)),
         list.map(
-          guide_badge_reasons(example.guide_badge, link, rule, context),
+          check_link(link, block, rules.release, context),
+          at_line(block.opening_line),
+        ),
+        list.map(
+          guide_badge_reasons(example.guide_badge, link, rules, context),
           at_line(heading.number),
         ),
       )
@@ -1717,6 +2713,21 @@ fn example_heading_problems(
 ///
 /// The line is a Markdown heading (`#` to `######`, a space and a title),
 /// then `badge_start`, the address, and exactly `badge_end`.
+///
+/// ## Examples
+///
+/// ### Read the badge of a heading <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_parse_badge_heading.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{type Reason}
+///
+/// pub fn badge_address() -> Result(String, Reason) {
+///   // Returns Ok("https://github.com/me/my_app/blob/1.2.0/test/snippets/hello.gleam")
+///   check.parse_badge_heading(
+///     "### Say hello <a href=\"https://github.com/me/my_app/blob/1.2.0/test/snippets/hello.gleam\"><img align=\"right\" alt=\"Tested snippet\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square\"></a>",
+///   )
+/// }
+/// ```
 pub fn parse_badge_heading(text: String) -> Result(String, Reason) {
   parse_heading_with_badge(text, SnippetBadge)
 }
@@ -1724,6 +2735,21 @@ pub fn parse_badge_heading(text: String) -> Result(String, Reason) {
 /// Reads a heading line that ends with the diff badge, and returns the link
 /// address of the badge. The rules are those of `parse_badge_heading`, with
 /// `diff_badge_end` in place of `badge_end`.
+///
+/// ## Examples
+///
+/// ### Read the diff badge of a heading <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_parse_diff_badge_heading.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{type Reason}
+///
+/// pub fn diff_badge_address() -> Result(String, Reason) {
+///   // Returns Ok("https://github.com/me/my_app/compare/1.1.0...1.2.0#diff-8b96d7e46c8e7f38e04701586133706ffc625db241b80e9c73922c10b89804f8")
+///   check.parse_diff_badge_heading(
+///     "### Rename the function <a href=\"https://github.com/me/my_app/compare/1.1.0...1.2.0#diff-8b96d7e46c8e7f38e04701586133706ffc625db241b80e9c73922c10b89804f8\"><img align=\"right\" alt=\"Tested diff\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-diff-lightgreen.svg?style=flat-square\"></a>",
+///   )
+/// }
+/// ```
 pub fn parse_diff_badge_heading(text: String) -> Result(String, Reason) {
   parse_heading_with_badge(text, DiffBadge)
 }
@@ -1737,6 +2763,26 @@ pub fn parse_diff_badge_heading(text: String) -> Result(String, Reason) {
 /// and exactly `guide_badge_end`. When the last badge is not a guide badge,
 /// the whole heading must end with the tested snippet badge, and a guide
 /// badge in another place is a `BrokenGuideBadge`.
+///
+/// ## Examples
+///
+/// ### Read both badges of a README heading <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_parse_example_heading.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{type ExampleHeading, type Reason}
+///
+/// pub fn example_heading() -> Result(ExampleHeading, Reason) {
+///   // Returns Ok(ExampleHeading(
+///   //   snippet_address: "https://github.com/me/my_app/blob/1.2.0/test/snippets/hello.gleam",
+///   //   guide_badge: GuideBadgeLink(
+///   //     "https://github.com/me/my_app/blob/1.2.0/docs/guides/hello.md#say-hello",
+///   //   ),
+///   // ))
+///   check.parse_example_heading(
+///     "### Say hello <a href=\"https://github.com/me/my_app/blob/1.2.0/test/snippets/hello.gleam\"><img align=\"right\" alt=\"Tested snippet\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square\"></a> <a href=\"https://github.com/me/my_app/blob/1.2.0/docs/guides/hello.md#say-hello\"><img align=\"right\" alt=\"Guide\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>",
+///   )
+/// }
+/// ```
 ///
 /// ## Errors
 ///
@@ -1786,6 +2832,26 @@ fn guide_badge_elsewhere(heading: String) -> GuideBadgeFound {
 /// path that stays inside the repository (the rule of
 /// `parse_snippet_link`).
 ///
+/// ## Examples
+///
+/// ### Read a guide link <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_parse_guide_link.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{type GuideLink, type Reason, GitHubRepository}
+///
+/// pub fn guide_link() -> Result(GuideLink, Reason) {
+///   // Returns Ok(GuideLink(
+///   //   tag: "1.2.0",
+///   //   path: "docs/guides/hello.md",
+///   //   anchor: "say-hello",
+///   // ))
+///   check.parse_guide_link(
+///     "https://github.com/me/my_app/blob/1.2.0/docs/guides/hello.md#say-hello",
+///     GitHubRepository(owner: "me", name: "my_app"),
+///   )
+/// }
+/// ```
+///
 /// ## Errors
 ///
 /// `ForeignGuideLink(address)` when the address names another repository
@@ -1811,15 +2877,19 @@ fn parse_heading_with_badge(
 ) -> Result(String, Reason) {
   let trimmed = string.trim(text)
   let hashes = count_leading(trimmed, "#", 0)
-  let is_heading =
-    hashes >= 1
-    && hashes <= 6
-    && string.starts_with(string.drop_start(trimmed, hashes), " ")
-  case is_heading, string.split(trimmed, badge_start) {
+  case is_heading_line(trimmed, hashes), string.split(trimmed, badge_start) {
     False, _ -> Error(missing_badge_reason(kind))
     True, [_no_badge] -> Error(badge_absent_reason(trimmed, kind))
     True, parts -> badge_address(parts, hashes, kind)
   }
+}
+
+/// Tells whether a trimmed line that starts with `hashes` `#` characters
+/// is a Markdown heading: 1 to 6 `#`, then a space.
+fn is_heading_line(trimmed: String, hashes: Int) -> Bool {
+  hashes >= 1
+  && hashes <= 6
+  && string.starts_with(string.drop_start(trimmed, hashes), " ")
 }
 
 fn badge_end_for(kind: BadgeKind) -> String {
@@ -1891,6 +2961,26 @@ fn badge_mismatch_reason(badge: String, kind: BadgeKind) -> Reason {
 /// `https://github.com/<owner>/<name>/blob/<tag>/<path>`, with a path that
 /// stays inside the repository.
 ///
+/// ## Examples
+///
+/// ### Read a snippet link with a line range <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_parse_snippet_link.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{type Reason, type SnippetLink, GitHubRepository}
+///
+/// pub fn snippet_link() -> Result(SnippetLink, Reason) {
+///   // Returns Ok(SnippetLink(
+///   //   tag: "1.2.0",
+///   //   path: "test/snippets/hello.gleam",
+///   //   anchor: "#L3-L5",
+///   // ))
+///   check.parse_snippet_link(
+///     "https://github.com/me/my_app/blob/1.2.0/test/snippets/hello.gleam#L3-L5",
+///     GitHubRepository(owner: "me", name: "my_app"),
+///   )
+/// }
+/// ```
+///
 /// ## Errors
 ///
 /// `ForeignLink(address)` when the address names another repository or
@@ -1933,6 +3023,19 @@ fn is_repository_path(path: String) -> Bool {
 /// Reads a line anchor: an empty string for the whole file, `#L<n>` for
 /// one line, or `#L<start>-L<end>` for a range. Line numbers are positive
 /// and have no leading zero.
+///
+/// ## Examples
+///
+/// ### Read a line range <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_parse_line_selection.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{type LineSelection, type Reason}
+///
+/// pub fn line_range() -> Result(LineSelection, Reason) {
+///   // Returns Ok(LineRange(start: 3, end: 5))
+///   check.parse_line_selection("#L3-L5")
+/// }
+/// ```
 pub fn parse_line_selection(anchor: String) -> Result(LineSelection, Reason) {
   case anchor {
     "" -> Ok(WholeFile)
@@ -1966,50 +3069,95 @@ fn parse_line_number(text: String) -> Result(Int, Nil) {
 }
 
 /// Checks one snippet link against its block. The tag is checked on its
-/// own; the line anchor, the file and the content are checked in order,
-/// each only when the one before it passed.
+/// own: it is the tag of the release of the document. The code of that
+/// release, the line anchor, the file and the content are checked in
+/// order, each only when the one before it passed.
 fn check_link(
   link: SnippetLink,
   block: FencedBlock,
+  release: DocumentRelease,
   context: CheckContext,
 ) -> List(Reason) {
-  let release_tag = context.project.version
-  let tag_problems = case link.tag == release_tag {
+  let tag_problems = case link.tag == release.tag {
     True -> []
-    False -> [WrongTag(found: link.tag, expected: release_tag)]
+    False -> [WrongTag(found: link.tag, expected: release.tag)]
   }
-  let content_problems = case check_content(link, block, context) {
-    Ok(Nil) -> []
-    Error(reason) -> [reason]
-  }
+  let content_problems =
+    release.code
+    |> result.try(compare_code(link, block, _, context))
+    |> result_to_reasons
   list.append(tag_problems, content_problems)
 }
 
-fn check_content(
+/// Compares a block with the file or line range of its link, read from
+/// `code`: the working tree, or the files at a tag.
+fn compare_code(
   link: SnippetLink,
   block: FencedBlock,
+  code: CodeSource,
   context: CheckContext,
 ) -> Result(Nil, Reason) {
   use selection <- result.try(parse_line_selection(link.anchor))
-  use source <- result.try(
-    context.read_source(link.path)
-    |> result.map_error(fn(error) { source_error_reason(link.path, error) }),
-  )
-  use expected <- result.try(expected_lines(source, selection, block))
+  use source <- result.try(read_code(code, link.path, context))
+  use difference <- result.try(first_block_difference(source, selection, block))
+  case difference, code {
+    None, _ -> Ok(Nil)
+    Some(line), WorkingTree ->
+      Error(BlockDiffers(
+        path: link.path,
+        anchor: link.anchor,
+        first_difference_line: line,
+      ))
+    Some(line), FilesAtTag(tag:) ->
+      Error(OldCodeDiffers(
+        path: link.path,
+        anchor: link.anchor,
+        tag:,
+        first_difference_line: line,
+      ))
+  }
+}
+
+/// Reads one file of the code of a release. A path that the check does not
+/// give to git (see `is_safe_path`) is not read at a tag.
+fn read_code(
+  code: CodeSource,
+  path: String,
+  context: CheckContext,
+) -> Result(String, Reason) {
+  case code {
+    WorkingTree ->
+      context.read_source(path)
+      |> result.map_error(fn(error) { source_error_reason(path, error) })
+    FilesAtTag(tag:) -> {
+      use Nil <- result.try(require(
+        is_safe_path(path),
+        UnsafeOldCodeLink(tag:, path:),
+      ))
+      use found <- result.try(
+        context.file_at_tag(tag, path) |> result.map_error(GitUnavailable),
+      )
+      option.to_result(found, MissingFileAtTag(path:, tag:))
+    }
+  }
+}
+
+/// Compares a block with the selected lines of a source file. Returns the
+/// line in the document of the first difference, or `None` when the block
+/// is the same.
+fn first_block_difference(
+  source: String,
+  selection: LineSelection,
+  block: FencedBlock,
+) -> Result(Option(Int), Reason) {
+  use expected <- result.map(expected_lines(source, selection, block))
   let block_lines = list.map(block.content, fn(line) { line.text })
   let actual = case selection {
     WholeFile -> list.append(block_lines, [""])
     LineRange(..) -> block_lines
   }
-  case first_difference(actual, expected, 0) {
-    None -> Ok(Nil)
-    Some(index) ->
-      Error(BlockDiffers(
-        path: link.path,
-        anchor: link.anchor,
-        first_difference_line: document_line(block, index),
-      ))
-  }
+  first_difference(actual, expected, 0)
+  |> option.map(document_line(block, _))
 }
 
 fn source_error_reason(path: String, error: simplifile.FileError) -> Reason {
@@ -2117,16 +3265,16 @@ fn document_line(block: FencedBlock, index: Int) -> Int {
 fn guide_badge_reasons(
   guide_badge: GuideBadgeFound,
   snippet: SnippetLink,
-  rule: GuideBadgeRule,
+  rules: DocumentRules,
   context: CheckContext,
 ) -> List(Reason) {
-  case rule, guide_badge {
+  case rules.guide_badge, guide_badge {
     GuideBadgeForbidden, NoGuideBadge -> []
     GuideBadgeForbidden, _ -> [GuideBadgeNotAllowed]
     GuideBadgeRequired, NoGuideBadge -> [MissingGuideBadge]
     GuideBadgeRequired, BrokenGuideBadge -> [MalformedGuideBadge]
     GuideBadgeRequired, GuideBadgeLink(address:) ->
-      guide_link_reasons(address, snippet, context)
+      guide_link_reasons(address, snippet, rules.release, context)
   }
 }
 
@@ -2136,13 +3284,14 @@ fn guide_badge_reasons(
 fn guide_link_reasons(
   address: String,
   snippet: SnippetLink,
+  release: DocumentRelease,
   context: CheckContext,
 ) -> List(Reason) {
   case parse_guide_link(address, context.project.repository) {
     Error(reason) -> [reason]
     Ok(link) ->
       list.append(
-        guide_tag_reasons(link, context.project.version),
+        guide_tag_reasons(link, release.tag),
         check_guide(link, snippet, context)
           |> result_to_reasons,
       )
@@ -2200,6 +3349,23 @@ fn require(condition: Bool, reason: Reason) -> Result(Nil, Reason) {
 
 /// Tells whether a path is a `.md` file under one of the guide
 /// directories. A trailing `/` of a directory is ignored.
+///
+/// ## Examples
+///
+/// ### Find the guides <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_is_guide_path.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check
+/// import gleam/list
+///
+/// pub fn guide_paths() -> List(Bool) {
+///   // Returns [True, False, False]
+///   list.map(
+///     ["docs/guides/hello.md", "docs/hello.md", "docs/guides/hello.txt"],
+///     check.is_guide_path(_, ["docs/guides/"]),
+///   )
+/// }
+/// ```
 pub fn is_guide_path(path: String, guides: List(String)) -> Bool {
   string.ends_with(path, ".md")
   && list.any(guides, fn(directory) {
@@ -2246,6 +3412,147 @@ fn shows_snippet(
 }
 
 // ---------------------------------------------------------------------------
+// Code at an older release
+// ---------------------------------------------------------------------------
+
+/// The exact text after the link address of a "code at an older release"
+/// badge for `tag`, to the end of the heading.
+fn old_code_badge_end(tag: String) -> String {
+  "\"><img align=\"right\" alt=\""
+  <> old_code_badge_alt_start
+  <> tag
+  <> "\" src=\""
+  <> old_code_badge_image_start
+  <> shields_text(tag)
+  <> old_code_badge_image_end
+  <> "\"></a>"
+}
+
+/// A text as a part of a shields.io badge address. shields.io reads a `-`
+/// as the end of a part and a `_` as a space, so each one is doubled.
+fn shields_text(text: String) -> String {
+  text
+  |> string.replace("-", "--")
+  |> string.replace("_", "__")
+}
+
+/// Reads a heading line that ends with the "code at an older release"
+/// badge, and returns its link.
+///
+/// The line is a Markdown heading (`#` to `######`, a space and a title),
+/// then one badge and nothing after it. The badge links to a file in
+/// `repository` at the old tag, with an optional line range:
+///
+/// ```markdown
+/// ### Title <a href="https://github.com/<owner>/<repo>/blob/<old tag>/<path>#L<start>-L<end>"><img align="right" alt="Code at <old tag>" src="https://img.shields.io/badge/%F0%9F%93%9C_code_at-<old tag>-lightgrey.svg?style=flat-square"></a>
+/// ```
+///
+/// In the image address, each `-` and `_` of the tag is doubled, as
+/// shields.io needs. The tag in the alt text, in the image address and in
+/// the link is the same tag.
+///
+/// ## Examples
+///
+/// ### Read the badge of code at an older release <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_parse_old_code_heading.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{type Reason, type SnippetLink, GitHubRepository}
+///
+/// pub fn old_code_link() -> Result(SnippetLink, Reason) {
+///   // Returns Ok(SnippetLink(
+///   //   tag: "1.1.0",
+///   //   path: "src/app.gleam",
+///   //   anchor: "#L3-L5",
+///   // ))
+///   check.parse_old_code_heading(
+///     "### Say hello in 1.1 <a href=\"https://github.com/me/my_app/blob/1.1.0/src/app.gleam#L3-L5\"><img align=\"right\" alt=\"Code at 1.1.0\" src=\"https://img.shields.io/badge/%F0%9F%93%9C_code_at-1.1.0-lightgrey.svg?style=flat-square\"></a>",
+///     GitHubRepository(owner: "me", name: "my_app"),
+///   )
+/// }
+/// ```
+///
+/// ## Errors
+///
+/// - `MalformedOldCodeBadge` when the line is not a heading, or the badge
+///   is not in the exact form for the tag of its link
+/// - `OldCodeBadgeWithOtherBadge` when the heading has another badge
+/// - `ForeignLink(address)` when the link names another repository or
+///   host, or a path out of the repository
+pub fn parse_old_code_heading(
+  text: String,
+  repository: GitHubRepository,
+) -> Result(SnippetLink, Reason) {
+  let trimmed = string.trim(text)
+  let hashes = count_leading(trimmed, "#", 0)
+  case is_heading_line(trimmed, hashes), string.split(trimmed, badge_start) {
+    False, _ -> Error(MalformedOldCodeBadge)
+    True, [_no_badge] -> Error(MalformedOldCodeBadge)
+    True, [title, badge] -> old_code_link(title, hashes, badge, repository)
+    True, _ -> Error(OldCodeBadgeWithOtherBadge)
+  }
+}
+
+fn old_code_link(
+  title: String,
+  hashes: Int,
+  badge: String,
+  repository: GitHubRepository,
+) -> Result(SnippetLink, Reason) {
+  let title_text = title |> string.drop_start(hashes) |> string.trim
+  use #(address, _after_address) <- result.try(
+    string.split_once(badge, "\"")
+    |> result.replace_error(MalformedOldCodeBadge),
+  )
+  use link <- result.try(parse_snippet_link(address, repository))
+  require(
+    title_text != "" && badge == address <> old_code_badge_end(link.tag),
+    MalformedOldCodeBadge,
+  )
+  |> result.replace(link)
+}
+
+/// The problems of a `gleam` block whose heading has the "code at an older
+/// release" badge.
+fn old_code_reasons(
+  heading: Line,
+  block: FencedBlock,
+  rules: DocumentRules,
+  context: CheckContext,
+) -> List(Reason) {
+  case rules.old_code {
+    OldCodeForbidden -> [OldCodeNotAllowed(context.project.guides)]
+    OldCodeAllowed ->
+      parse_old_code_heading(heading.text, context.project.repository)
+      |> result.try(check_old_code(_, block, rules.release, context))
+      |> result_to_reasons
+  }
+}
+
+/// Checks a link to code at an older release against its block. The tag
+/// and the path, the release of the tag (before the release of the
+/// document), the tag in the clone, the line anchor, the file at the tag
+/// and the content are checked in order, each only when the one before it
+/// passed.
+fn check_old_code(
+  link: SnippetLink,
+  block: FencedBlock,
+  release: DocumentRelease,
+  context: CheckContext,
+) -> Result(Nil, Reason) {
+  let SnippetLink(tag:, path:, anchor: _) = link
+  use Nil <- result.try(require(
+    is_safe_tag(tag) && is_safe_path(path),
+    UnsafeOldCodeLink(tag:, path:),
+  ))
+  use Nil <- result.try(require(
+    is_release_before(tag, release.tag),
+    NotAnOlderRelease(tag:, version: release.tag),
+  ))
+  use Nil <- result.try(require_old_tag(tag, context))
+  compare_code(link, block, FilesAtTag(tag), context)
+}
+
+// ---------------------------------------------------------------------------
 // Heading anchors
 // ---------------------------------------------------------------------------
 
@@ -2257,6 +3564,19 @@ fn shows_snippet(
 /// text. Each heading gets the anchor `heading_slug` of its text. When an
 /// anchor is already used by an earlier heading, the second heading gets
 /// the anchor with `-1` after it, the third `-2`, and so on.
+///
+/// ## Examples
+///
+/// ### List the anchors of a document <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_heading_anchors.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check
+///
+/// pub fn anchors() -> List(String) {
+///   // Returns ["my-app", "usage", "usage-1"]
+///   check.heading_anchors("# My app\n\n## Usage\n\n## Usage\n")
+/// }
+/// ```
 pub fn heading_anchors(markdown: String) -> List(String) {
   let #(_seen, anchors) =
     numbered_lines(markdown, 1)
@@ -2324,6 +3644,19 @@ fn remove_closing_hashes(text: String) -> String {
 /// `http2-over-tls`. `Check one document <a href="..."><img ...></a>`
 /// gives `check-one-document-`, and a heading with two badge links after
 /// its text, each after a space, gets two hyphens at the end.
+///
+/// ## Examples
+///
+/// ### Make the anchor of a heading <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_heading_slug.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check
+///
+/// pub fn anchor() -> String {
+///   // Returns "the-requestbody-type"
+///   check.heading_slug("The `RequestBody` type")
+/// }
+/// ```
 pub fn heading_slug(heading: String) -> String {
   heading
   |> string.trim
@@ -2410,6 +3743,7 @@ fn remove_emphasis_underscores(word: String) -> String {
 fn check_diff_block(
   block: FencedBlock,
   above: List(Line),
+  release: DocumentRelease,
   file: String,
   context: CheckContext,
 ) -> List(Problem) {
@@ -2417,22 +3751,31 @@ fn check_diff_block(
     None -> [
       Problem(file:, line: block.opening_line, reason: MissingDiffBadgeHeading),
     ]
-    Some(heading) -> diff_heading_problems(heading, block, file, context)
+    Some(heading) ->
+      diff_heading_problems(heading, block, release, file, context)
   }
 }
 
 fn diff_heading_problems(
   heading: Line,
   block: FencedBlock,
+  release: DocumentRelease,
   file: String,
   context: CheckContext,
 ) -> List(Problem) {
   let link =
     parse_diff_badge_heading(heading.text)
+    |> result.try(fn(address) {
+      require(
+        !string.contains(heading.text, old_code_badge_marker),
+        OldCodeBadgeWithOtherBadge,
+      )
+      |> result.replace(address)
+    })
     |> result.try(parse_compare_link(_, context.project.repository))
   case link {
     Ok(link) ->
-      check_compare_link(link, block, context)
+      check_compare_link(link, block, release, context)
       |> list.map(fn(found) { Problem(file:, line: found.0, reason: found.1) })
     Error(reason) -> [Problem(file:, line: block.opening_line, reason:)]
   }
@@ -2442,6 +3785,26 @@ fn diff_heading_problems(
 /// be `https://github.com/<owner>/<name>/compare/<old>...<new>#diff-<hex>`
 /// for `repository`, and both tags must be safe tag names (see
 /// `is_safe_tag`).
+///
+/// ## Examples
+///
+/// ### Read a compare link <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_parse_compare_link.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{type CompareLink, type Reason, GitHubRepository}
+///
+/// pub fn compare_link() -> Result(CompareLink, Reason) {
+///   // Returns Ok(CompareLink(
+///   //   old_tag: "1.1.0",
+///   //   new_tag: "1.2.0",
+///   //   anchor_digest: "8b96d7e46c8e7f38e04701586133706ffc625db241b80e9c73922c10b89804f8",
+///   // ))
+///   check.parse_compare_link(
+///     "https://github.com/me/my_app/compare/1.1.0...1.2.0#diff-8b96d7e46c8e7f38e04701586133706ffc625db241b80e9c73922c10b89804f8",
+///     GitHubRepository(owner: "me", name: "my_app"),
+///   )
+/// }
+/// ```
 ///
 /// ## Errors
 ///
@@ -2475,6 +3838,20 @@ pub fn parse_compare_link(
 
 /// Tells whether a text is a safe tag name to give to git: letters, digits,
 /// `.`, `_` and `-`, not starting with `-` and with no `..`.
+///
+/// ## Examples
+///
+/// ### Find the safe tags <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_is_safe_tag.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check
+/// import gleam/list
+///
+/// pub fn safe_tags() -> List(Bool) {
+///   // Returns [True, False, False]
+///   list.map(["1.2.0", "-x", "1..2"], check.is_safe_tag)
+/// }
+/// ```
 pub fn is_safe_tag(tag: String) -> Bool {
   tag != ""
   && is_made_of(tag, tag_characters)
@@ -2485,6 +3862,20 @@ pub fn is_safe_tag(tag: String) -> Bool {
 /// Tells whether a text is a safe repository path to give to git: a path
 /// inside the repository (see `is_repository_path`) made of letters,
 /// digits, `.`, `_`, `-` and `/`, not starting with `-`.
+///
+/// ## Examples
+///
+/// ### Find the safe paths <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_is_safe_path.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check
+/// import gleam/list
+///
+/// pub fn safe_paths() -> List(Bool) {
+///   // Returns [True, False, False]
+///   list.map(["src/app.gleam", "../secret.txt", "-p"], check.is_safe_path)
+/// }
+/// ```
 pub fn is_safe_path(path: String) -> Bool {
   is_repository_path(path)
   && is_made_of(path, path_characters)
@@ -2504,25 +3895,28 @@ fn is_made_of(text: String, characters: String) -> Bool {
 }
 
 /// Checks a compare link against its block. The new tag is checked on its
-/// own. The file header, the anchor, the old tag, the diff and the lines
-/// are checked in order, each only when the one before it passed. Each
-/// problem comes with the line of the document that it is about.
+/// own: it is the tag of the release of the document. The file header, the
+/// anchor, the old tag, the code of the release, the diff and the lines are
+/// checked in order, each only when the one before it passed. Each problem
+/// comes with the line of the document that it is about.
 fn check_compare_link(
   link: CompareLink,
   block: FencedBlock,
+  release: DocumentRelease,
   context: CheckContext,
 ) -> List(#(Int, Reason)) {
-  let release_tag = context.project.version
-  let tag_problems = case link.new_tag == release_tag {
+  let tag_problems = case link.new_tag == release.tag {
     True -> []
     False -> [
       #(
         block.opening_line,
-        WrongNewTag(found: link.new_tag, expected: release_tag),
+        WrongNewTag(found: link.new_tag, expected: release.tag),
       ),
     ]
   }
-  let content_problems = case check_diff_content(link, block, context) {
+  let content_problems = case
+    check_diff_content(link, block, release, context)
+  {
     Ok(Nil) -> []
     Error(problem) -> [problem]
   }
@@ -2532,9 +3926,11 @@ fn check_compare_link(
 fn check_diff_content(
   link: CompareLink,
   block: FencedBlock,
+  release: DocumentRelease,
   context: CheckContext,
 ) -> Result(Nil, #(Int, Reason)) {
   let at_block = fn(reason) { #(block.opening_line, reason) }
+  let old_tag = link.old_tag
   use #(path, body) <- result.try(
     parse_diff_file_header(block.content) |> result.map_error(at_block),
   )
@@ -2542,18 +3938,33 @@ fn check_diff_content(
     check_diff_anchor(link, path) |> result.map_error(at_block),
   )
   use Nil <- result.try(
-    require_old_tag(link.old_tag, context) |> result.map_error(at_block),
+    require_old_tag(old_tag, context) |> result.map_error(at_block),
   )
+  use new_side <- result.try(release.code |> result.map_error(at_block))
   use diff_text <- result.try(
-    context.diff_from_tag(link.old_tag, path)
+    release_diff(old_tag, new_side, path, context)
     |> result.map_error(fn(error) { at_block(GitUnavailable(error)) }),
   )
   case parse_hunks(diff_text) {
-    [] -> Error(at_block(NoDiffForPath(path:, old_tag: link.old_tag)))
+    [] -> Error(at_block(NoDiffForPath(path:, old_tag:, new_side:)))
     hunks -> {
-      let line_not_found = DiffLineNotFound(path:, old_tag: link.old_tag)
+      let line_not_found = DiffLineNotFound(path:, old_tag:, new_side:)
       match_segments(diff_segments(body), hunks, line_not_found)
     }
+  }
+}
+
+/// The git diff of one path from the old tag to the code of a release: the
+/// working tree, or the files at its tag.
+fn release_diff(
+  old_tag: String,
+  new_side: CodeSource,
+  path: String,
+  context: CheckContext,
+) -> Result(String, GitError) {
+  case new_side {
+    WorkingTree -> context.diff_from_tag(old_tag, path)
+    FilesAtTag(tag:) -> context.diff_between_tags(old_tag, tag, path)
   }
 }
 
@@ -2602,6 +4013,19 @@ fn require_diff_body(
 
 /// The SHA-256 hex digest of a repository path. GitHub's compare view
 /// gives each file the anchor `#diff-` followed by this digest.
+///
+/// ## Examples
+///
+/// ### Make the digest of a path <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_path_digest.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check
+///
+/// pub fn digest() -> String {
+///   // Returns "8b96d7e46c8e7f38e04701586133706ffc625db241b80e9c73922c10b89804f8"
+///   check.path_digest("src/app.gleam")
+/// }
+/// ```
 pub fn path_digest(path: String) -> String {
   sha256_hex(path)
 }
@@ -2631,6 +4055,36 @@ fn require_old_tag(tag: String, context: CheckContext) -> Result(Nil, Reason) {
 
 /// Splits the text of a git diff into its hunks. The lines before the first
 /// `@@` header (`diff --git`, `index`, `---` and `+++`) are left out.
+///
+/// ## Examples
+///
+/// ### Split a diff into hunks <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_parse_hunks.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check.{type DiffHunk}
+///
+/// pub fn hunks() -> List(DiffHunk) {
+///   let diff_text =
+///     "diff --git a/src/app.gleam b/src/app.gleam
+/// --- a/src/app.gleam
+/// +++ b/src/app.gleam
+/// @@ -1,3 +1,3 @@
+///  pub fn name() {
+/// -  \"old\"
+/// +  \"new\"
+///  }
+/// "
+///   // Returns [
+///   //   DiffHunk(header: "@@ -1,3 +1,3 @@", lines: [
+///   //     " pub fn name() {",
+///   //     "-  \"old\"",
+///   //     "+  \"new\"",
+///   //     " }",
+///   //   ]),
+///   // ]
+///   check.parse_hunks(diff_text)
+/// }
+/// ```
 pub fn parse_hunks(diff_text: String) -> List(DiffHunk) {
   source_lines(diff_text)
   |> list.fold([], add_to_hunks)
@@ -2852,6 +4306,23 @@ fn line_number_at(segment: DiffSegment, index: Int) -> Int {
 ///   pipes call capitalised modules (`|> Enum.map(`).
 ///
 /// Rust also has `fn name(`; the docs have no Rust code.
+///
+/// ## Examples
+///
+/// ### Find the lines of Gleam code <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_looks_like_gleam.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets/check
+/// import gleam/list
+///
+/// pub fn gleam_lines() -> List(Bool) {
+///   // Returns [True, False, True]
+///   list.map(
+///     ["import gleam/io", "npm install", "pub fn main() {"],
+///     check.looks_like_gleam,
+///   )
+/// }
+/// ```
 pub fn looks_like_gleam(text: String) -> Bool {
   let code = string.trim_start(text)
   is_gleam_import(code)

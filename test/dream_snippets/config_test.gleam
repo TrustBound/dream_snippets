@@ -14,6 +14,7 @@ import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/suite.{type TestSuite}
 import dream_test/unit.{type UnitNode, describe, group, it}
 import gleam/list
+import gleam/result
 
 const project_lines =
   "name = \"my_app\"
@@ -67,7 +68,7 @@ version = \"9\"
             CheckedRoot("releases", ReleaseNotes, MayBeMissing),
             CheckedRoot("src", GleamSource, MayBeMissing),
           ],
-          checked_from_version: Version(0, 0, 0),
+          checked_from_version: Version(0, 0, 0, []),
         )),
       )
       |> or_fail_with(
@@ -110,7 +111,7 @@ guides = [\"docs/guides\", \"examples/guides/\"]
             CheckedRoot("HISTORY.md", Changelog, MustExist),
             CheckedRoot("src", GleamSource, MustExist),
           ],
-          checked_from_version: Version(1, 0, 0),
+          checked_from_version: Version(1, 0, 0, []),
         )),
       )
       |> or_fail_with("Each setting should replace its default")
@@ -145,7 +146,7 @@ guides = [\"docs/guides\", \"examples/guides/\"]
               CheckedRoot("releases", ReleaseNotes, MayBeMissing),
               CheckedRoot("src", GleamSource, MayBeMissing),
             ],
-            checked_from_version: Version(0, 0, 0),
+            checked_from_version: Version(0, 0, 0, []),
           )),
         )
         |> or_fail_with("Only the Markdown roots should change")
@@ -401,6 +402,22 @@ fn parse_error_tests() -> UnitNode {
 
 fn describe_error_tests() -> UnitNode {
   group("describe_error", [
+    it("shows a line break in a TOML error in a visible form", fn() {
+      // Arrange
+      let text = "name = \"my_app\nversion = \"0.2.0\"\n"
+
+      // Act
+      let message =
+        config.parse(text) |> result.map_error(config.describe_error)
+
+      // Assert
+      message
+      |> should
+      |> be_equal(Error(
+        "gleam.toml is not valid TOML: found \\n where \" was expected",
+      ))
+      |> or_fail_with("The message should stay on one line")
+    }),
     it("describes every error in one line", fn() {
       // Arrange
       let errors = [
@@ -425,8 +442,8 @@ fn describe_error_tests() -> UnitNode {
       |> be_equal([
         "gleam.toml is not valid TOML: found EOF where value was expected",
         "gleam.toml sets the key name twice",
-        "gleam.toml has no version = \"...\" line before its first [section].",
-        "gleam.toml has no name = \"...\" line before its first [section].",
+        "gleam.toml has no version = \"...\" line before its first [section]",
+        "gleam.toml has no name = \"...\" line before its first [section]",
         "gleam.toml has no repository = { type = \"github\", user = \"...\", repo = \"...\" }",
         "gleam.toml names a gitlab repository; the badges link at GitHub, so the repository type must be github",
         "version in gleam.toml must be a string, but its TOML type is Int",

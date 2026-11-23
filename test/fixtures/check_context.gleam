@@ -8,6 +8,7 @@ import dream_snippets/check.{
 }
 import dream_snippets/git.{type GitError}
 import gleam/list
+import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import simplifile
@@ -100,6 +101,18 @@ pub const odd_diff =
   "@@ odd
 -old line"
 
+/// The file with code at the tag 2.4.1 in the fake history. Line 3 is
+/// indented, and the file ends with a newline.
+pub const old_code_path = "src/old.gleam"
+
+pub const old_code_source =
+  "pub fn upload(request) {
+  case request.stream {
+    Some(chunks) -> save(chunks)
+  }
+}
+"
+
 /// The project of the fake context: dream at 3.0.0.
 pub fn project() -> Project {
   Project(
@@ -112,16 +125,42 @@ pub fn project() -> Project {
   )
 }
 
-/// A context with the snippet files above, the tag 2.4.1, and the fake
-/// diffs above.
+/// The fake output of `git diff 2.3.0 2.4.1 -- src/app.gleam`.
+pub const fake_diff_between_tags =
+  "diff --git a/src/app.gleam b/src/app.gleam
+index 0000000..1111111 100644
+--- a/src/app.gleam
++++ b/src/app.gleam
+@@ -1,3 +1,3 @@
+ import gleam/io
+-import gleam/option.{type Option}
++import gleam/option.{None, Some}
+ import gleam/yielder
+"
+
+/// A context with the snippet files above, the tags 2.3.0 and 2.4.1, and
+/// the fake diffs above.
 pub fn context() -> CheckContext {
   CheckContext(
     project: project(),
-    checked_from_version: Version(3, 0, 0),
+    checked_from_version: Version(3, 0, 0, []),
     read_source: read_fake_source,
-    tag_exists: fn(tag) { Ok(tag == "2.4.1") },
+    tag_exists: fn(tag) { Ok(tag == "2.4.1" || tag == "2.3.0") },
     diff_from_tag: fake_diff_from_tag,
+    diff_between_tags: fake_diff_between,
+    file_at_tag: fake_file_at_tag,
   )
+}
+
+fn fake_diff_between(
+  old_tag: String,
+  new_tag: String,
+  path: String,
+) -> Result(String, GitError) {
+  case old_tag, new_tag, path {
+    "2.3.0", "2.4.1", "src/app.gleam" -> Ok(fake_diff_between_tags)
+    _, _, _ -> Ok("")
+  }
 }
 
 fn read_fake_source(path: String) -> Result(String, simplifile.FileError) {
@@ -145,6 +184,51 @@ fn fake_diff_from_tag(tag: String, path: String) -> Result(String, GitError) {
     "2.4.1", "src/odd.gleam" -> Ok(odd_diff)
     _, _ -> Ok("")
   }
+}
+
+fn fake_file_at_tag(
+  tag: String,
+  path: String,
+) -> Result(Option(String), GitError) {
+  case tag, path {
+    "2.4.1", "src/old.gleam" -> Ok(Some(old_code_source))
+    _, _ -> Ok(None)
+  }
+}
+
+/// A heading with a "code at an older release" badge that links to
+/// `target` (a path and an optional anchor) at the tag 2.4.1.
+pub fn old_code_heading(target: String) -> String {
+  old_code_heading_with("2.4.1", "2.4.1", "2.4.1", target)
+}
+
+/// A heading with a "code at an older release" badge: the link names
+/// `link_tag` and `target`, the alt text names `alt_tag`, and the image
+/// address holds `image_tag` as it is.
+pub fn old_code_heading_with(
+  link_tag: String,
+  alt_tag: String,
+  image_tag: String,
+  target: String,
+) -> String {
+  "### Before <a href=\"https://github.com/TrustBound/dream/blob/"
+  <> link_tag
+  <> "/"
+  <> target
+  <> "\"><img align=\"right\" alt=\"Code at "
+  <> alt_tag
+  <> "\" src=\"https://img.shields.io/badge/%F0%9F%93%9C_code_at-"
+  <> image_tag
+  <> "-lightgrey.svg?style=flat-square\"></a>"
+}
+
+/// A `gleam` block with the `body` lines under `heading_line`. The heading
+/// is line 1, the fence line 3, and the `body` lines start at line 4.
+pub fn gleam_document(
+  heading_line: String,
+  body: List(String),
+) -> List(String) {
+  list.flatten([[heading_line, "", "```gleam"], body, ["```"]])
 }
 
 /// A heading with a badge that links to `target` (a path and an optional

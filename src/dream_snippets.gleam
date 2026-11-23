@@ -13,7 +13,8 @@
 //// with exit code 1 when it finds a problem or cannot run. It never uses the
 //// network: a badge link is changed to a local path and the file is read
 //// from the working tree. For a `diff` block it runs `git diff` in the
-//// project root.
+//// project root, and for code at an older release it runs `git ls-tree`
+//// and `git show` there.
 ////
 //// The rules are in `dream_snippets/check`. The settings, read from the
 //// `gleam.toml` of the project, are in `dream_snippets/config`.
@@ -70,6 +71,20 @@ pub type Output {
 /// Checks the docs of the project in the current directory, prints each
 /// problem and a summary, and stops with exit code 1 if there is a problem
 /// or an error, so that `make` targets, hooks and CI fail too.
+///
+/// ## Examples
+///
+/// ### Run the check from a module of your project <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_main.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets
+///
+/// pub fn main() -> Nil {
+///   // Prints each problem and the summary line, and stops with exit status 1
+///   // when there is a problem.
+///   dream_snippets.main()
+/// }
+/// ```
 pub fn main() -> Nil {
   let result = output(check_project("."))
   list.each(result.standard_output, io.println)
@@ -136,6 +151,10 @@ pub fn check_project(directory: String) -> Result(ProjectReport, CheckError) {
       read_source: fn(path) { simplifile.read(join(directory, path)) },
       tag_exists: fn(tag) { git.tag_exists(repository, tag) },
       diff_from_tag: fn(tag, path) { git.diff_from_tag(repository, tag, path) },
+      diff_between_tags: fn(old_tag, new_tag, path) {
+        git.diff_between_tags(repository, old_tag, new_tag, path)
+      },
+      file_at_tag: fn(tag, path) { git.file_at_tag(repository, tag, path) },
     )
   use reports <- result.try(
     list.try_map(files, fn(file) { check_file(directory, file, context) }),
@@ -155,6 +174,25 @@ pub fn check_project(directory: String) -> Result(ProjectReport, CheckError) {
 /// line (see `check.summary`). The exit status is 0 with no problems and 1
 /// otherwise. For an error, the standard error is one line,
 /// `error: <description>`, and the exit status is 1.
+///
+/// ## Examples
+///
+/// ### Turn an error into the command output <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_output.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets.{type Output, MissingRoot}
+///
+/// pub fn output_of_missing_root() -> Output {
+///   // Returns Output(
+///   //   standard_output: [],
+///   //   standard_error: [
+///   //     "error: docs is set in [tools.dream_snippets] in gleam.toml, but it does not exist",
+///   //   ],
+///   //   exit_status: 1,
+///   // )
+///   dream_snippets.output(Error(MissingRoot("docs")))
+/// }
+/// ```
 pub fn output(result: Result(ProjectReport, CheckError)) -> Output {
   case result {
     Ok(project_report) -> report_output(project_report)
@@ -186,8 +224,26 @@ fn report_output(project_report: ProjectReport) -> Output {
   )
 }
 
-/// Describes an error that stops the check, in one line.
+/// Describes an error that stops the check, in one line (see
+/// `check.one_line`).
+///
+/// ## Examples
+///
+/// ### Describe an error that stops the check <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_describe_check_error.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+///
+/// ```gleam
+/// import dream_snippets.{MissingRoot}
+///
+/// pub fn missing_root_message() -> String {
+///   // Returns "examples is set in [tools.dream_snippets] in gleam.toml, but it does not exist"
+///   dream_snippets.describe_error(MissingRoot("examples"))
+/// }
+/// ```
 pub fn describe_error(error: CheckError) -> String {
+  check.one_line(error_text(error))
+}
+
+fn error_text(error: CheckError) -> String {
   case error {
     InvalidConfig(error:) -> config.describe_error(error)
     ListFailed(path:, reason:) ->
@@ -241,20 +297,20 @@ fn check_markdown_file(
 }
 
 /// Checks the code blocks of release notes, and that they follow the
-/// release notes template.
+/// release notes template. A file whose name is not `release-<version>.md`
+/// gets only one problem at line 1, because its version is not known.
 fn check_release_notes(
   path: String,
   text: String,
   context: check.CheckContext,
 ) -> Report {
-  let report = check.check_markdown(path, text, context)
-  Report(
-    ..report,
-    problems: list.append(
-      report.problems,
-      check.check_release_notes_template(path, text),
-    ),
-  )
+  case check.release_notes_version(path) {
+    Ok(_version) -> check.check_release_notes(path, text, context)
+    Error(Nil) ->
+      Report(blocks_checked: 0, diff_blocks_checked: 0, problems: [
+        check.Problem(file: path, line: 1, reason: check.MisnamedReleaseNotes),
+      ])
+  }
 }
 
 fn empty_report() -> Report {
@@ -293,22 +349,43 @@ fn list_root_files(
   case is_directory {
     True ->
       walk_directory(directory, root.path, root.kind, checked_from_version)
-    False -> list_root_file(directory, root)
+    False -> list_root_file(directory, root, checked_from_version)
   }
 }
 
+/// A root that is a file. A release notes file follows the rules of a file
+/// in a directory root: it is skipped when its version is before
+/// `checked_from_version`. It is kept when its name has no version, so that
+/// `check_release_notes` reports the name.
 fn list_root_file(
   directory: String,
   root: CheckedRoot,
+  checked_from_version: Version,
 ) -> Result(List(#(String, check.DocumentKind)), CheckError) {
   use is_file <- result.try(
     simplifile.is_file(join(directory, root.path))
     |> result.map_error(ListFailed(root.path, _)),
   )
   case is_file, root.presence {
-    True, _ -> Ok([#(root.path, root.kind)])
+    True, _ -> Ok(keep_root_file(root, checked_from_version))
     False, MayBeMissing -> Ok([])
     False, MustExist -> Error(MissingRoot(root.path))
+  }
+}
+
+fn keep_root_file(
+  root: CheckedRoot,
+  checked_from_version: Version,
+) -> List(#(String, check.DocumentKind)) {
+  let in_scope = case root.kind {
+    check.ReleaseNotes ->
+      check.release_notes_version(root.path) == Error(Nil)
+      || check.is_checked_release_notes(root.path, checked_from_version)
+    check.MarkdownDocument | check.GleamSource | check.Changelog -> True
+  }
+  case in_scope {
+    True -> [#(root.path, root.kind)]
+    False -> []
   }
 }
 

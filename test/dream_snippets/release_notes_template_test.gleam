@@ -2,22 +2,31 @@
 //// which fails when release notes do not follow the template.
 ////
 //// Each fixture is a small inline file, so the tests never read real
-//// release notes.
+//// release notes. The guide tests read the real "Release notes template"
+//// guide, so that its list of sections cannot drift from the code.
 
 import dream_snippets/check.{
-  ConflictingReleaseNotesSections, MissingReleaseDate, MissingReleaseNotesChoice,
-  MissingReleaseNotesSection, MissingReleaseNotesSubsection, Problem,
+  type TemplateSection, ConflictingReleaseNotesSections, MissingReleaseDate,
+  MissingReleaseNotesChoice, MissingReleaseNotesSection,
+  MissingReleaseNotesSubsection, OptionalSection, Problem,
   ReleaseNotesSectionOutOfOrder, ReleaseNotesTitleMismatch,
-  RepeatedReleaseNotesSection, UnknownReleaseNotesSection,
+  RepeatedReleaseNotesSection, RequiredSection, UnknownReleaseNotesSection,
 }
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/suite.{type TestSuite}
 import dream_test/unit.{type UnitNode, describe, group, it}
 import fixtures/check_context.{project}
+import gleam/int
 import gleam/list
+import gleam/result
 import gleam/string
+import simplifile
 
 const file = "releases/release-3.0.0.md"
+
+const guide_path = "docs/guides/release-notes-template.md"
+
+const no_difference = "the guide lists the sections of the template"
 
 pub fn tests() -> TestSuite {
   describe("dream_snippets/check release notes template", [
@@ -25,6 +34,7 @@ pub fn tests() -> TestSuite {
     title_tests(),
     section_tests(),
     describe_tests(),
+    guide_tests(),
   ])
 }
 
@@ -482,6 +492,187 @@ fn describe_tests() -> UnitNode {
         "\"## Upgrading\" has no \"### Migration Guide\", but the template requires it in that section; see \"Release notes template\" in docs/contributing/release-notes.md",
       ])
       |> or_fail_with("Each message should name the problem and the guide")
+    }),
+  ])
+}
+
+// ---------------------------------------------------------------------------
+// The guide
+// ---------------------------------------------------------------------------
+
+/// One item of a section list: the headings in backticks, joined with
+/// ` or `, and the mark `required` or `optional`.
+type SectionItem {
+  SectionItem(headings: String, mark: String)
+}
+
+/// The section list of the template in the code, as items.
+fn template_items() -> List(SectionItem) {
+  list.map(check.release_notes_template, template_item)
+}
+
+fn template_item(section: TemplateSection) -> SectionItem {
+  let headings =
+    section.choices
+    |> list.map(fn(choice) { "`" <> choice.name <> "`" })
+    |> string.join(" or ")
+  let mark = case section.presence {
+    RequiredSection -> "required"
+    OptionalSection -> "optional"
+  }
+  SectionItem(headings:, mark:)
+}
+
+/// Reads the section list of the guide. The list is the numbered items
+/// after the `## The sections` heading and before the next `##` heading.
+/// Each item has this form, and other lines are skipped:
+///
+/// ```text
+/// <number>. `<heading>`: <mark>
+/// <number>. `<heading>` or `<heading>`: <mark>, <more text>
+/// ```
+///
+/// `<mark>` is `required` or `optional`. The text after the first `, ` is
+/// for the reader and is not compared.
+fn guide_items(guide: String) -> List(SectionItem) {
+  guide
+  |> string.split("\n")
+  |> list.drop_while(fn(line) { line != "## The sections" })
+  |> list.drop(1)
+  |> list.take_while(fn(line) { !string.starts_with(line, "## ") })
+  |> list.filter_map(numbered_item_text)
+  |> list.map(guide_item)
+}
+
+fn numbered_item_text(line: String) -> Result(String, Nil) {
+  use #(number, item) <- result.try(string.split_once(line, ". "))
+  use _number <- result.map(int.parse(number))
+  item
+}
+
+fn guide_item(item: String) -> SectionItem {
+  let #(headings, rest) =
+    string.split_once(item, ": ") |> result.unwrap(#(item, ""))
+  let #(mark, _more) =
+    string.split_once(rest, ", ") |> result.unwrap(#(rest, ""))
+  SectionItem(headings:, mark:)
+}
+
+/// Describes the first difference between the list of the guide and the
+/// list of the code, or returns `no_difference`. `number` is the item
+/// number of the first items.
+fn first_difference(
+  guide: List(SectionItem),
+  code: List(SectionItem),
+  number: Int,
+) -> String {
+  case guide, code {
+    [], [] -> no_difference
+    [guide_first, ..guide_rest], [code_first, ..code_rest]
+      if guide_first == code_first
+    -> first_difference(guide_rest, code_rest, number + 1)
+    [guide_first, ..], [code_first, ..] ->
+      item_label(number)
+      <> "the guide has "
+      <> describe_item(guide_first)
+      <> ", but the code has "
+      <> describe_item(code_first)
+    [guide_first, ..], [] ->
+      item_label(number)
+      <> "the guide has "
+      <> describe_item(guide_first)
+      <> ", but the code has no more sections"
+    [], [code_first, ..] ->
+      item_label(number)
+      <> "the guide has no more items, but the code has "
+      <> describe_item(code_first)
+  }
+}
+
+fn item_label(number: Int) -> String {
+  "item " <> int.to_string(number) <> ": "
+}
+
+fn describe_item(item: SectionItem) -> String {
+  "\"" <> item.headings <> ": " <> item.mark <> "\""
+}
+
+fn guide_tests() -> UnitNode {
+  group("the Release notes template guide", [
+    it("lists the sections of the template in the code", fn() {
+      // Arrange
+      let guide = simplifile.read(guide_path)
+
+      // Act
+      let difference =
+        result.map(guide, fn(text) {
+          first_difference(guide_items(text), template_items(), 1)
+        })
+
+      // Assert
+      difference
+      |> should
+      |> be_equal(Ok(no_difference))
+      |> or_fail_with(
+        "The section list of the guide should be the template in the code",
+      )
+    }),
+    it("names the first item that differs from the code", fn() {
+      // Arrange
+      let guide =
+        notes([
+          "## The sections",
+          "",
+          "1. `Key Highlights`: required",
+          "2. `What's New`: optional",
+          "3. `Removed`: optional",
+          "",
+          "## Next",
+          "",
+          "4. `Testing`: required",
+        ])
+
+      // Act
+      let difference = first_difference(guide_items(guide), template_items(), 1)
+
+      // Assert
+      difference
+      |> should
+      |> be_equal(
+        "item 2: the guide has \"`What's New`: optional\", but the code has \"`What's New`: required\"",
+      )
+      |> or_fail_with("The message should name the first difference")
+    }),
+    it("names a code section that the guide leaves out", fn() {
+      // Arrange
+      let guide =
+        notes(["## The sections", "", "1. `Key Highlights`: required"])
+
+      // Act
+      let difference = first_difference(guide_items(guide), template_items(), 1)
+
+      // Assert
+      difference
+      |> should
+      |> be_equal(
+        "item 2: the guide has no more items, but the code has \"`What's New`: required\"",
+      )
+      |> or_fail_with("The message should name the missing section")
+    }),
+    it("names a guide item that the code does not have", fn() {
+      // Arrange
+      let items = list.append(template_items(), [SectionItem("`Extra`", "")])
+
+      // Act
+      let difference = first_difference(items, template_items(), 1)
+
+      // Assert
+      difference
+      |> should
+      |> be_equal(
+        "item 12: the guide has \"`Extra`: \", but the code has no more sections",
+      )
+      |> or_fail_with("The message should name the extra item")
     }),
   ])
 }
