@@ -1,0 +1,178 @@
+//// Fixtures for the tests of `dream_snippets/check`: a fake project, fake
+//// snippet files and a fake git history, and builders for small inline
+//// documents. The tests never read real docs, snippets or history.
+
+import dream_snippets/check.{
+  type CheckContext, type Project, type Report, CheckContext, GitHubRepository,
+  Project, Version,
+}
+import dream_snippets/git.{type GitError}
+import gleam/list
+import gleam/result
+import gleam/string
+import simplifile
+
+pub const snippet_path = "test/snippets/example.gleam"
+
+/// A snippet file with a module comment. Line 8 is indented.
+pub const snippet_source =
+  "//// An example snippet.
+
+import gleam/io
+
+pub const answer = 42
+
+pub fn main() {
+  io.println(\"hi\")
+}
+"
+
+/// A snippet file with no module comment and no final newline.
+pub const plain_snippet_path = "test/snippets/plain.gleam"
+
+pub const plain_snippet_source =
+  "import gleam/io
+
+pub fn main() {
+  io.println(\"hi\")
+}"
+
+/// A snippet file whose module comment has no blank line after it.
+pub const tight_snippet_path = "test/snippets/tight.gleam"
+
+pub const tight_snippet_source =
+  "//// A tight snippet.
+pub const answer = 42
+"
+
+/// A snippet file that cannot be read.
+pub const unreadable_path = "test/snippets/locked.gleam"
+
+pub const badge_end =
+  "\"><img align=\"right\" alt=\"Tested snippet\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square\"></a>"
+
+pub const diff_badge_end =
+  "\"><img align=\"right\" alt=\"Tested diff\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-diff-lightgreen.svg?style=flat-square\"></a>"
+
+/// The file with a diff in the fake history: it changed between the tag
+/// 2.4.1 and the working tree.
+pub const diff_path = "src/app.gleam"
+
+/// The fake output of `git diff 2.4.1 -- src/app.gleam`.
+pub const fake_diff =
+  "diff --git a/src/app.gleam b/src/app.gleam
+index 1111111..2222222 100644
+--- a/src/app.gleam
++++ b/src/app.gleam
+@@ -1,4 +1,4 @@
+ import gleam/io
+-import gleam/option.{None, Some}
++import dream/http/request.{Stream}
+ import gleam/yielder
+@@ -10,5 +10,5 @@ pub fn upload(
+ pub fn upload(request) {
+-  case request.stream {
+-    Some(chunks) -> save(chunks)
++  case request.body {
++    Stream(chunks) -> save(chunks)
+   }
+"
+
+/// A file whose fake diff has a hunk header with no closing `@@` and no
+/// final newline.
+pub const odd_diff_path = "src/odd.gleam"
+
+pub const odd_diff =
+  "@@ odd
+-old line"
+
+/// The project of the fake context: dream at 3.0.0.
+pub fn project() -> Project {
+  Project(
+    name: "dream",
+    version: "3.0.0",
+    repository: GitHubRepository(owner: "TrustBound", name: "dream"),
+    badge_guide: "docs/contributing/contributing.md",
+  )
+}
+
+/// A context with the snippet files above, the tag 2.4.1, and the fake
+/// diffs above.
+pub fn context() -> CheckContext {
+  CheckContext(
+    project: project(),
+    checked_from_version: Version(3, 0, 0),
+    read_source: read_fake_source,
+    tag_exists: fn(tag) { Ok(tag == "2.4.1") },
+    diff_from_tag: fake_diff_from_tag,
+  )
+}
+
+fn read_fake_source(path: String) -> Result(String, simplifile.FileError) {
+  let files = [
+    #(snippet_path, snippet_source),
+    #(plain_snippet_path, plain_snippet_source),
+    #(tight_snippet_path, tight_snippet_source),
+  ]
+  case path == unreadable_path {
+    True -> Error(simplifile.Eacces)
+    False ->
+      list.key_find(files, path) |> result.replace_error(simplifile.Enoent)
+  }
+}
+
+fn fake_diff_from_tag(tag: String, path: String) -> Result(String, GitError) {
+  case tag, path {
+    "2.4.1", "src/app.gleam" -> Ok(fake_diff)
+    "2.4.1", "src/odd.gleam" -> Ok(odd_diff)
+    _, _ -> Ok("")
+  }
+}
+
+/// A heading with a badge that links to `target` (a path and an optional
+/// anchor) at the tag 3.0.0.
+pub fn heading(target: String) -> String {
+  "### Example <a href=\"https://github.com/TrustBound/dream/blob/3.0.0/"
+  <> target
+  <> badge_end
+}
+
+/// A heading with a diff badge that links to the compare view `range`, at
+/// the anchor of `path`.
+pub fn diff_heading(range: String, path: String) -> String {
+  "### Change <a href=\"https://github.com/TrustBound/dream/compare/"
+  <> range
+  <> "#diff-"
+  <> check.path_digest(path)
+  <> diff_badge_end
+}
+
+/// A diff block under `heading_line`. The heading is line 1, the fence
+/// line 3, and the `body` lines start at line 4.
+pub fn diff_document(heading_line: String, body: List(String)) -> List(String) {
+  list.flatten([[heading_line, "", "```diff"], body, ["```"]])
+}
+
+pub fn diff_file_header(path: String) -> List(String) {
+  ["--- a/" <> path, "+++ b/" <> path]
+}
+
+pub fn document(lines: List(String)) -> String {
+  string.join(lines, "\n") <> "\n"
+}
+
+/// Checks the lines as the Markdown document `doc.md` with the fake
+/// context.
+pub fn check(lines: List(String)) -> Report {
+  check.check_markdown("doc.md", document(lines), context())
+}
+
+/// Checks a diff block with a badge for 2.4.1...3.0.0 and the anchor of
+/// `diff_path`.
+pub fn diff_report(body: List(String)) -> Report {
+  check(diff_document(diff_heading("2.4.1...3.0.0", diff_path), body))
+}
+
+pub fn main_function() -> List(String) {
+  ["pub fn main() {", "  io.println(\"hi\")", "}"]
+}

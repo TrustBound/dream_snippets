@@ -1,0 +1,21 @@
+name = "dream_snippets"
+version = "1.0.0"
+description = "Checks that every code block in a Gleam project's docs matches a tested snippet file"
+licences = ["MIT"]
+repository = { type = "github", user = "TrustBound", repo = "dream_snippets" }
+links = [
+    { title = "Documentation", href = "https://hexdocs.pm/dream_snippets" },
+    { title = "GitHub", href = "https://github.com/TrustBound/dream_snippets" },
+]
+
+[dependencies]
+gleam_stdlib = ">= 1.0.0 and < 2.0.0"
+simplifile = ">= 2.4.0 and < 3.0.0"
+tom = ">= 2.0.2 and < 3.0.0"
+
+[dev-dependencies]
+# Switched to a Hex version range once it is published.
+dream_test = { git = "https://github.com/TrustBound/dream_test.git", ref = "c583145874e63118cc5e680a293dd52cd4c35517" }
+
+[tools.dream_snippets]
+markdown = ["README.md", "SECURITY.md", "CONTRIBUTING.md"]
