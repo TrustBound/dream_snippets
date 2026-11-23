@@ -18,7 +18,7 @@ import dream_snippets/check.{
 }
 import dream_snippets/git.{GitFailed, GitNotFound}
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/types.{type TestSuite}
+import dream_test/suite.{type TestSuite}
 import dream_test/unit.{type UnitNode, describe, group, it}
 import fixtures/check_context.{
   check, context, diff_document, diff_file_header, diff_heading, diff_path,
@@ -31,7 +31,7 @@ import gleam/order
 import gleam/string
 import simplifile
 
-pub fn tests() -> TestSuite(Nil) {
+pub fn tests() -> TestSuite {
   describe("dream_snippets/check", [
     passing_tests(),
     failing_tests(),

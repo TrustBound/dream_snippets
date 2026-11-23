@@ -5,7 +5,7 @@
 import dream_snippets/check.{DiffHunk}
 import dream_snippets/git.{Git, GitFailed, GitNotFound}
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/types.{type TestSuite}
+import dream_test/suite.{type TestSuite}
 import dream_test/unit.{type UnitNode, describe, group, it}
 import fixtures/project
 import gleam/list
@@ -16,7 +16,7 @@ const old_text = "pub fn name() {\n  \"old\"\n}\n"
 
 const new_text = "pub fn name() {\n  \"new\"\n}\n"
 
-pub fn tests() -> TestSuite(Nil) {
+pub fn tests() -> TestSuite {
   describe("dream_snippets/git", [tag_tests(), diff_tests(), describe_tests()])
 }
 

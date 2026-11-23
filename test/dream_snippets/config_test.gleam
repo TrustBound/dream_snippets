@@ -11,7 +11,7 @@ import dream_snippets/config.{
   UnknownSetting, UnsupportedRepository, VersionNotFound, WrongSettingType,
 }
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/types.{type TestSuite}
+import dream_test/suite.{type TestSuite}
 import dream_test/unit.{type UnitNode, describe, group, it}
 import gleam/list
 
@@ -21,7 +21,7 @@ version = \"1.2.0\"
 repository = { type = \"github\", user = \"me\", repo = \"my_app\" }
 "
 
-pub fn tests() -> TestSuite(Nil) {
+pub fn tests() -> TestSuite {
   describe("dream_snippets/config", [
     parse_tests(),
     parse_error_tests(),

@@ -8,7 +8,7 @@ import dream_snippets.{
 import dream_snippets/check
 import dream_snippets/config.{VersionNotFound}
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/types.{type TestSuite}
+import dream_test/suite.{type TestSuite}
 import dream_test/unit.{type UnitNode, describe, group, it}
 import fixtures/project
 import gleam/list
@@ -33,7 +33,7 @@ const old_app = "pub fn name() {\n  \"old\"\n}\n"
 
 const new_app = "pub fn name() {\n  \"new\"\n}\n"
 
-pub fn tests() -> TestSuite(Nil) {
+pub fn tests() -> TestSuite {
   describe("dream_snippets", [
     check_project_tests(),
     check_project_error_tests(),

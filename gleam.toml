@@ -15,7 +15,7 @@ tom = ">= 2.0.2 and < 3.0.0"
 
 [dev-dependencies]
 # Switched to a Hex version range once it is published.
-dream_test = { git = "https://github.com/TrustBound/dream_test.git", ref = "c583145874e63118cc5e680a293dd52cd4c35517" }
+dream_test = { git = "https://github.com/TrustBound/dream_test.git", ref = "1639959578a14ae3577f8e3ae5cac058f933aa53" }
 
 [tools.dream_snippets]
 markdown = ["README.md", "SECURITY.md", "CONTRIBUTING.md"]

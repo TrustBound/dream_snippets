@@ -6,14 +6,14 @@ import dream_snippets/check.{
 }
 import dream_snippets/config.{CheckedRoot, Config, MayBeMissing}
 import dream_test/matchers.{be_equal, or_fail_with, should}
-import dream_test/types.{type TestSuite}
+import dream_test/suite.{type TestSuite}
 import dream_test/unit.{describe, group, it}
 import fixtures/project
 import snippets/doc_check_project
 import snippets/doc_parse_config
 import snippets/readme_check_markdown
 
-pub fn tests() -> TestSuite(Nil) {
+pub fn tests() -> TestSuite {
   describe("snippets", [
     group("readme_check_markdown.check_guide", [
       it("finds a gleam block with no badge heading", fn() {
