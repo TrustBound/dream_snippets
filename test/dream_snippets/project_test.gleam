@@ -74,7 +74,7 @@ fn check_project_tests() -> UnitNode {
       let readme =
         "# App\n\n### Hello <a href=\"https://github.com/me/app/blob/1.1.0/test/snippets/hello.gleam"
         <> snippet_badge_end
-        <> " <a href=\"https://github.com/me/app/blob/1.1.0/docs/guides/hello.md#hello"
+        <> " <a href=\"https://github.com/me/app/blob/1.1.0/docs/guides/hello.md#hello-"
         <> guide_badge_end
         <> "\n\n```gleam\npub fn hello() {\n  \"hi\"\n}\n```\n\n#### Rename <a href=\"https://github.com/me/app/compare/1.0.0...1.1.0#diff-"
         <> check.path_digest("src/app.gleam")

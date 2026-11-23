@@ -26,7 +26,7 @@ import simplifile
 
 const example_target = "test/snippets/example.gleam#L7-L9"
 
-const guide_target = "docs/guides/example.md#example"
+const guide_target = "docs/guides/example.md#example-"
 
 pub fn tests() -> TestSuite {
   describe("dream_snippets/check guide badge", [
@@ -244,8 +244,8 @@ fn readme_link_tests() -> UnitNode {
       let line =
         readme_heading(example_target, guide_target)
         |> string.replace(
-          "/blob/3.0.0/docs/guides/example.md#example",
-          "/blob/2.4.1/docs/guides/missing.md#example",
+          "/blob/3.0.0/docs/guides/example.md#example-",
+          "/blob/2.4.1/docs/guides/missing.md#example-",
         )
       let lines = readme_document(line)
 
@@ -496,7 +496,7 @@ fn parse_tests() -> UnitNode {
       link
       |> should
       |> be_equal(
-        Ok(GuideLink(tag: "3.0.0", path: guide_path, anchor: "example")),
+        Ok(GuideLink(tag: "3.0.0", path: guide_path, anchor: "example-")),
       )
       |> or_fail_with("The anchor should be read without its #")
     }),
@@ -551,7 +551,7 @@ fn anchor_tests() -> UnitNode {
         #("1. Error types", "1-error-types"),
         #(
           "Check one document <a href=\"https://github.com/me/app/blob/1.0.0/a.gleam\"><img align=\"right\" alt=\"Tested snippet\" src=\"https://img.shields.io/badge/x.svg\"></a>",
-          "check-one-document",
+          "check-one-document-",
         ),
         #("Read the [guide](https://example.com/a_b) now", "read-the-guide-now"),
         #("Use _emphasis_ and **bold**", "use-emphasis-and-bold"),
@@ -576,6 +576,41 @@ fn anchor_tests() -> UnitNode {
       |> should
       |> be_equal(list.map(cases, fn(entry) { entry.1 }))
       |> or_fail_with("Each heading should get GitHub's anchor")
+    }),
+    it("gives the anchors GitHub gives to headings with badge links", fn() {
+      // Arrange
+      let snippet_badge =
+        "<a href=\"https://github.com/me/app/blob/1.0.0/test/snippets/a.gleam\"><img align=\"right\" alt=\"Tested snippet\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square\"></a>"
+      let guide_badge =
+        "<a href=\"https://github.com/me/app/blob/1.0.0/docs/guides/a.md#a\"><img align=\"right\" alt=\"Guide\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>"
+      let text =
+        document([
+          "## Check one document",
+          "### Check one document " <> snippet_badge,
+          "### Check a project and read what the command prints "
+            <> snippet_badge,
+          "### Read the settings from the text of a `gleam.toml` "
+            <> snippet_badge,
+          "### Check a project and read what the command prints "
+            <> snippet_badge
+            <> " "
+            <> guide_badge,
+        ])
+
+      // Act
+      let anchors = check.heading_anchors(text)
+
+      // Assert
+      anchors
+      |> should
+      |> be_equal([
+        "check-one-document",
+        "check-one-document-",
+        "check-a-project-and-read-what-the-command-prints-",
+        "read-the-settings-from-the-text-of-a-gleamtoml-",
+        "check-a-project-and-read-what-the-command-prints--",
+      ])
+      |> or_fail_with("Each space before a badge link should give a hyphen")
     }),
     it("numbers repeated anchors and reads headings outside fences only", fn() {
       // Arrange

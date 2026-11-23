@@ -83,7 +83,7 @@ checked_from_version = \"1.0.0\"
 
 ## Testing
 
-- 181 tests run, 0 failed, 100.0% line coverage (959 of 959 lines), in about 0.6 seconds (Apple M1 Max, OTP 29, Gleam 1.19.2)
+- 182 tests run, 0 failed, 100.0% line coverage (959 of 959 lines), in about 0.6 seconds (Apple M1 Max, OTP 29, Gleam 1.19.2)
 
 ## Installing
 

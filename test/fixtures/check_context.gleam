@@ -58,7 +58,7 @@ pub const guide_badge_end =
   "\"><img align=\"right\" alt=\"Guide\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>"
 
 /// A guide that shows the example of `snippet_path`. Its anchors are
-/// `example-guide`, `example` and `café-au-lait`.
+/// `example-guide`, `example-` and `café-au-lait`.
 pub const guide_path = "docs/guides/example.md"
 
 /// A guide that does not show the example. Its anchors are `other-guide`

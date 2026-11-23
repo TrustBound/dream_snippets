@@ -24,7 +24,7 @@ Examples in doc comments are code blocks too. Put the heading and the badge insi
 Each example in the root `README.md` of a project has a second badge, the guide badge. It links to the section of a guide that explains the example. The guide badge comes after the tested snippet badge, with one space between them. Both images float right, so the guide badge shows to the left of the tested snippet badge:
 
 ```markdown
-### Encode a user <a href="https://github.com/me/my_app/blob/1.2.0/test/snippets/encode_user.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/me/my_app/blob/1.2.0/docs/guides/encoding.md#encode-a-user"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
+### Encode a user <a href="https://github.com/me/my_app/blob/1.2.0/test/snippets/encode_user.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/me/my_app/blob/1.2.0/docs/guides/encoding.md#encode-a-user-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 ```
 
 The check wants these things of the guide badge:
@@ -32,7 +32,7 @@ The check wants these things of the guide badge:
 - The link is a `blob` link of the same repository, at the tag of the `version` in `gleam.toml`.
 - The path is a `.md` file under a guide directory. The default directory is `docs/guides`. The `guides` setting changes it.
 - The guide file exists.
-- The link ends with `#<anchor>`, and the anchor is the anchor of a heading in the guide.
+- The link ends with `#<anchor>`, and the anchor is the anchor of a heading in the guide. The guide heading has a tested snippet badge, so its anchor ends with a hyphen, as in `#encode-a-user-`.
 - The guide has a tested snippet badge that links to the same snippet file. The line range can be different.
 
 The guide badge is only for the root README. A heading in a guide, the changelog, release notes or a doc comment has only the tested snippet badge. A `diff` block heading has no guide badge.
@@ -41,13 +41,13 @@ The guide badge is only for the root README. A heading in a guide, the changelog
 
 The anchor of a heading is the one that GitHub makes:
 
-1. Remove inline HTML tags, such as a badge link, and Markdown marks. A link keeps its text, and a code span keeps its text.
-2. Remove the spaces at the start and the end.
+1. Remove the spaces at the start and the end of the heading text.
+2. Remove inline HTML tags, such as a badge link, and Markdown marks. The spaces around a tag stay. A link keeps its text, and a code span keeps its text.
 3. Change the text to lowercase.
 4. Remove each character that is not a letter, a digit, a space, a hyphen or an underscore.
-5. Change each space to a hyphen.
+5. Change each space to a hyphen. The spaces are not removed again after step 2.
 
-For example, `What's New` gets `whats-new`, and ``The `RequestBody` type`` gets `the-requestbody-type`. When two headings get the same anchor, the second one gets `-1` at the end, and the third one gets `-2`.
+For example, `What's New` gets `whats-new`, and ``The `RequestBody` type`` gets `the-requestbody-type`. A heading with a badge after its text keeps the space before the badge, so `### Encode a user <a ...><img ...></a>` gets `encode-a-user-`. A heading with two badges, each after a space, gets two hyphens at the end. When two headings get the same anchor, the second one gets `-1` at the end, and the third one gets `-2`.
 
 ## Show a change with a diff block
 

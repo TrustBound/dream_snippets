@@ -2304,23 +2304,29 @@ fn remove_closing_hashes(text: String) -> String {
 ///
 /// The rule:
 ///
-/// 1. Remove the Markdown and HTML marks. Inline HTML tags, such as a badge
-///    link, are removed, and the text between them is kept. A link
-///    `[text](address)` keeps its text. Backticks are removed, and the text
-///    of a code span is kept as it is. A `_` at the start or end of a word
-///    outside a code span is an emphasis mark, and is removed.
-/// 2. Remove the spaces at the start and the end.
+/// 1. Remove the spaces at the start and the end of the heading text.
+/// 2. Remove the Markdown and HTML marks. Inline HTML tags, such as a badge
+///    link, are removed, and the text between them is kept. The spaces
+///    around a tag stay. A link `[text](address)` keeps its text. Backticks
+///    are removed, and the text of a code span is kept as it is. A `_` at
+///    the start or end of a word outside a code span is an emphasis mark,
+///    and is removed.
 /// 3. Change the text to lowercase.
 /// 4. Remove each character that is not a letter, a digit, a space, a
 ///    hyphen or an underscore. Letters and digits of every script are kept,
 ///    and so are combining marks.
-/// 5. Change each space to a hyphen.
+/// 5. Change each space to a hyphen. The spaces are not trimmed after the
+///    tags are removed, so each space before a badge link at the end of a
+///    heading gives a hyphen at the end of the anchor.
 ///
 /// For example, ``The `RequestBody` type`` gives `the-requestbody-type`,
 /// `What's New` gives `whats-new` and `HTTP/2 over TLS` gives
-/// `http2-over-tls`.
+/// `http2-over-tls`. `Check one document <a href="..."><img ...></a>`
+/// gives `check-one-document-`, and a heading with two badge links after
+/// its text, each after a space, gets two hyphens at the end.
 pub fn heading_slug(heading: String) -> String {
   heading
+  |> string.trim
   |> string.split("`")
   |> list.index_map(fn(part, index) {
     case index % 2 {
@@ -2329,7 +2335,6 @@ pub fn heading_slug(heading: String) -> String {
     }
   })
   |> string.join("")
-  |> string.trim
   |> string.lowercase
   |> keep_slug_characters
   |> string.replace(" ", "-")
