@@ -8,19 +8,22 @@
 import dream_snippets/check.{
   BrokenGuideBadge, ExampleHeading, ExampleNotInGuide, ForeignGuideLink,
   GuideAnchorNotFound, GuideBadgeLink, GuideBadgeNotAllowed, GuideLink,
-  MalformedGuideBadge, MissingBadgeHeading, MissingGuideAnchor,
+  GuideTextLink, MalformedGuideBadge, MissingBadgeHeading, MissingGuideAnchor,
   MissingGuideBadge, MissingGuideFile, NoGuideBadge, NotAGuidePath, Problem,
-  Report, UnreadableFile, WrongGuideTag, WrongTag,
+  Report, UnreadableFile, UntitledGuide, WrongGuideBadgeName, WrongGuideTag,
+  WrongTag,
 }
 import dream_test/matchers.{be_equal, or_fail_with, should}
 import dream_test/suite.{type TestSuite}
 import dream_test/unit.{type UnitNode, describe, group, it}
 import fixtures/check_context.{
   check, check_readme, context, diff_document, diff_file_header, diff_heading,
-  diff_path, document, guide_badge_end, guide_path, heading, other_guide_path,
-  project, readme_document, readme_heading, snippet_path, unreadable_guide_path,
+  diff_path, document, guide_badge_end, guide_path, heading,
+  named_guide_badge_end, other_guide_path, project, readme_document,
+  readme_heading, snippet_path, unreadable_guide_path, untitled_guide_path,
 }
 import gleam/list
+import gleam/option.{None, Some}
 import gleam/string
 import simplifile
 
@@ -33,6 +36,8 @@ pub fn tests() -> TestSuite {
     readme_passing_tests(),
     readme_badge_tests(),
     readme_link_tests(),
+    readme_name_tests(),
+    text_link_tests(),
     other_document_tests(),
     parse_tests(),
     anchor_tests(),
@@ -361,11 +366,13 @@ fn readme_link_tests() -> UnitNode {
     }),
     it("fails a guide that does not show the example", fn() {
       // Arrange
-      let lines =
-        readme_document(readme_heading(
-          example_target,
-          other_guide_path <> "#setup",
-        ))
+      let line =
+        heading(example_target)
+        <> " <a href=\"https://github.com/TrustBound/dream/blob/3.0.0/"
+        <> other_guide_path
+        <> "#setup"
+        <> named_guide_badge_end("Guide: Other guide")
+      let lines = readme_document(line)
 
       // Act
       let report = check_readme(lines)
@@ -381,6 +388,246 @@ fn readme_link_tests() -> UnitNode {
         ),
       ])
       |> or_fail_with("The guide must link to the same snippet")
+    }),
+  ])
+}
+
+fn readme_name_tests() -> UnitNode {
+  group("check_readme guide badge name", [
+    it("fails a guide badge with the alt text Guide and no title", fn() {
+      // Arrange
+      let line =
+        readme_heading(example_target, guide_target)
+        |> string.replace(
+          "alt=\"Guide: Example guide\" title=\"Guide: Example guide\"",
+          "alt=\"Guide\"",
+        )
+      let lines = readme_document(line)
+
+      // Act
+      let report = check_readme(lines)
+
+      // Assert
+      report.problems
+      |> should
+      |> be_equal([
+        Problem(
+          "README.md",
+          1,
+          WrongGuideBadgeName(
+            path: guide_path,
+            expected: "Guide: Example guide",
+          ),
+        ),
+      ])
+      |> or_fail_with("The badge must name its guide")
+    }),
+    it("fails a guide badge whose title is not the guide title", fn() {
+      // Arrange
+      let line =
+        readme_heading(example_target, guide_target)
+        |> string.replace(
+          "title=\"Guide: Example guide\"",
+          "title=\"Guide: Other guide\"",
+        )
+      let lines = readme_document(line)
+
+      // Act
+      let report = check_readme(lines)
+
+      // Assert
+      report.problems
+      |> should
+      |> be_equal([
+        Problem(
+          "README.md",
+          1,
+          WrongGuideBadgeName(
+            path: guide_path,
+            expected: "Guide: Example guide",
+          ),
+        ),
+      ])
+      |> or_fail_with("The title must be the title of the guide")
+    }),
+    it("fails a guide badge whose alt text is not the guide title", fn() {
+      // Arrange
+      let line =
+        readme_heading(example_target, guide_target)
+        |> string.replace(
+          "alt=\"Guide: Example guide\"",
+          "alt=\"Guide: Example\"",
+        )
+      let lines = readme_document(line)
+
+      // Act
+      let report = check_readme(lines)
+
+      // Assert
+      report.problems
+      |> should
+      |> be_equal([
+        Problem(
+          "README.md",
+          1,
+          WrongGuideBadgeName(
+            path: guide_path,
+            expected: "Guide: Example guide",
+          ),
+        ),
+      ])
+      |> or_fail_with("The alt text must be the title of the guide")
+    }),
+    it("fails a guide with no title line outside code blocks", fn() {
+      // Arrange
+      let line =
+        heading(example_target)
+        <> " <a href=\"https://github.com/TrustBound/dream/blob/3.0.0/"
+        <> untitled_guide_path
+        <> "#example-"
+        <> named_guide_badge_end("Guide: Not a title")
+      let lines = readme_document(line)
+
+      // Act
+      let report = check_readme(lines)
+
+      // Assert
+      report.problems
+      |> should
+      |> be_equal([Problem("README.md", 1, UntitledGuide(untitled_guide_path))])
+      |> or_fail_with("A # line in a code block is not the guide title")
+    }),
+    it("reports a wrong name and a missing anchor together", fn() {
+      // Arrange
+      let line =
+        heading(example_target)
+        <> " <a href=\"https://github.com/TrustBound/dream/blob/3.0.0/"
+        <> guide_path
+        <> "#setup"
+        <> named_guide_badge_end("Guide")
+      let lines = readme_document(line)
+
+      // Act
+      let report = check_readme(lines)
+
+      // Assert
+      report.problems
+      |> should
+      |> be_equal([
+        Problem(
+          "README.md",
+          1,
+          GuideAnchorNotFound(path: guide_path, anchor: "setup"),
+        ),
+        Problem(
+          "README.md",
+          1,
+          WrongGuideBadgeName(
+            path: guide_path,
+            expected: "Guide: Example guide",
+          ),
+        ),
+      ])
+      |> or_fail_with("The name is checked even when the anchor fails")
+    }),
+  ])
+}
+
+const guide_text_link =
+  "<sub>📖 [Guide](https://github.com/TrustBound/dream/blob/main/docs/guides/example.md)</sub>"
+
+fn text_link_tests() -> UnitNode {
+  group("guide text link under an example", [
+    it("fails a guide text link after a code block", fn() {
+      // Arrange
+      let lines =
+        list.append(
+          readme_document(readme_heading(example_target, guide_target)),
+          ["", guide_text_link],
+        )
+
+      // Act
+      let report = check_readme(lines)
+
+      // Assert
+      report.problems
+      |> should
+      |> be_equal([Problem("README.md", 9, GuideTextLink)])
+      |> or_fail_with("The guide badge is the only link to the guide")
+    }),
+    it("fails a guide text link after text under the code block", fn() {
+      // Arrange
+      let lines =
+        list.append(readme_document(heading(example_target)), [
+          "",
+          "Some text.",
+          "",
+          "  <sub>📖 [Setup](docs/guides/other.md) · [Example](docs/guides/example.md)</sub>  ",
+        ])
+
+      // Act
+      let report = check(lines)
+
+      // Assert
+      report.problems
+      |> should
+      |> be_equal([Problem("doc.md", 11, GuideTextLink)])
+      |> or_fail_with("A relative guide link is a guide text link too")
+    }),
+    it("passes a guide text link after the next heading", fn() {
+      // Arrange
+      let lines =
+        list.append(readme_document(heading(example_target)), [
+          "",
+          "## More",
+          "",
+          guide_text_link,
+        ])
+
+      // Act
+      let report = check(lines)
+
+      // Assert
+      report.problems
+      |> should
+      |> be_equal([])
+      |> or_fail_with("A line in the next section is not under the example")
+    }),
+    it("passes a guide text link after the next code block starts", fn() {
+      // Arrange
+      let lines =
+        list.flatten([
+          readme_document(heading(example_target)),
+          ["", "```text illustration", guide_text_link, "```"],
+        ])
+
+      // Act
+      let report = check(lines)
+
+      // Assert
+      report.problems
+      |> should
+      |> be_equal([])
+      |> or_fail_with("A line in a code block is not a guide text link")
+    }),
+    it("passes a small link that is not to a guide", fn() {
+      // Arrange
+      let lines =
+        list.append(readme_document(heading(example_target)), [
+          "",
+          "<sub>📖 [API](https://hexdocs.pm/dream/example.html)</sub>",
+          "<sub>[Guide](docs/guides/example.md)</sub>",
+          "<sub>📖 [Guide](docs/guides/example.md)",
+        ])
+
+      // Act
+      let report = check(lines)
+
+      // Assert
+      report.problems
+      |> should
+      |> be_equal([])
+      |> or_fail_with("Only a 📖 line that links to a guide is a problem")
     }),
   ])
 }
@@ -466,10 +713,58 @@ fn parse_tests() -> UnitNode {
       |> be_equal(
         Ok(ExampleHeading(
           snippet_address:,
-          guide_badge: GuideBadgeLink(guide_address),
+          guide_badge: GuideBadgeLink(
+            address: guide_address,
+            alt: "Guide: Example guide",
+            title: Some("Guide: Example guide"),
+          ),
         )),
       )
-      |> or_fail_with("Both addresses should be read")
+      |> or_fail_with("Both addresses and the badge name should be read")
+    }),
+    it("reads a guide badge with no title", fn() {
+      // Arrange
+      let line =
+        readme_heading(example_target, guide_target)
+        |> string.replace(" title=\"Guide: Example guide\"", "")
+
+      // Act
+      let parsed = check.parse_example_heading(line)
+
+      // Assert
+      parsed
+      |> should
+      |> be_equal(
+        Ok(ExampleHeading(
+          snippet_address:,
+          guide_badge: GuideBadgeLink(
+            address: guide_address,
+            alt: "Guide: Example guide",
+            title: None,
+          ),
+        )),
+      )
+      |> or_fail_with("A badge with no title should be read")
+    }),
+    it("reads a guide badge with a quote in its name as broken", fn() {
+      // Arrange
+      let line =
+        readme_heading(example_target, guide_target)
+        |> string.replace(
+          "title=\"Guide: Example guide\"",
+          "title=\"Guide\" class=\"x\"",
+        )
+
+      // Act
+      let parsed = check.parse_example_heading(line)
+
+      // Assert
+      parsed
+      |> should
+      |> be_equal(
+        Ok(ExampleHeading(snippet_address:, guide_badge: BrokenGuideBadge)),
+      )
+      |> or_fail_with("Another attribute should make the badge broken")
     }),
     it("reads a heading with no guide badge", fn() {
       // Act
@@ -665,6 +960,12 @@ fn describe_tests() -> UnitNode {
         MissingGuideFile("docs/guides/missing.md"),
         GuideAnchorNotFound(path: "docs/guides/a.md", anchor: "setup"),
         ExampleNotInGuide(path: "docs/guides/a.md", snippet: snippet_path),
+        WrongGuideBadgeName(
+          path: "docs/guides/a.md",
+          expected: "Guide: Getting started",
+        ),
+        UntitledGuide("docs/guides/a.md"),
+        GuideTextLink,
       ]
 
       // Act
@@ -684,6 +985,9 @@ fn describe_tests() -> UnitNode {
         "the guide badge links to docs/guides/missing.md, which is not a file in this repository",
         "the guide badge links to the anchor #setup, but docs/guides/a.md has no heading with that anchor",
         "docs/guides/a.md has no tested snippet badge that links to test/snippets/example.gleam, but the guide of a README example must show that example",
+        "the guide badge must name its guide: alt=\"Guide: Getting started\" and title=\"Guide: Getting started\", from the \"# \" title line of docs/guides/a.md",
+        "docs/guides/a.md has no \"# \" title line outside code blocks, but the guide badge names its guide by that title",
+        "this line links to a guide from an example; remove it, because the guide badge on the example heading is the link to the guide",
       ])
       |> or_fail_with("Each guide badge reason should have its message")
     }),

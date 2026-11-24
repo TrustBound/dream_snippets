@@ -73,7 +73,7 @@ The rest is the reason. Match its first words with the sections below:
 | `this line looks like Gleam code`, `this code fence has no language`, `this code fence has no closing fence` | [Other fences](#other-fences) |
 | `this <language> code block has no heading` for a language that is not `gleam` or `diff`, `the badge links to ... which is not under a tested_files path` | [Blocks of other languages](#blocks-of-other-languages) |
 | `the package`, `the argument`, `this gleam add line`, `this dependency line`, `the requirement of` | [Packages and dependency lines](#packages-and-dependency-lines) |
-| `this README example heading`, `the guide badge`, `this heading has a guide badge`, `... has no tested snippet badge that links to` | [README examples and the guide badge](#readme-examples-and-the-guide-badge) |
+| `this README example heading`, `the guide badge`, `this heading has a guide badge`, `... has no tested snippet badge that links to`, `has no "# " title line`, `this line links to a guide` | [README examples and the guide badge](#readme-examples-and-the-guide-badge) |
 | `this diff block`, `the tested diff badge`, `the diff badge link`, `the compare link`, `the diff block`, `the hunk header`, `this line is not in "git diff`, `cannot run git`, `... has no changes since the tag` | [Diff blocks](#diff-blocks) |
 | `the code at an older release badge`, `this heading has the code at an older release badge`, `the tag ... is not`, `which is not a file at the tag` | [Code at an older release](#code-at-an-older-release) |
 | `a release notes file must be named`, or any message that ends with `see "Release notes template"` | [Release notes](#release-notes) |
@@ -205,6 +205,9 @@ README.md:5: the guide badge link to docs/guides/getting-started.md has no #<anc
 README.md:5: the guide badge links to docs/guides/greeting.md, which is not a file in this repository
 README.md:5: the guide badge links to the anchor #greet-a-user, but docs/guides/getting-started.md has no heading with that anchor
 README.md:5: docs/guides/getting-started.md has no tested snippet badge that links to test/snippets/guide_getting_started_greeting.gleam, but the guide of a README example must show that example
+README.md:5: the guide badge must name its guide: alt="Guide: Getting started" and title="Guide: Getting started", from the "# " title line of docs/guides/getting-started.md
+README.md:5: docs/guides/getting-started.md has no "# " title line outside code blocks, but the guide badge names its guide by that title
+README.md:12: this line links to a guide from an example; remove it, because the guide badge on the example heading is the link to the guide
 docs/guides/getting-started.md:3: this heading has a guide badge, but only README example headings have one; here the heading has only the tested snippet badge
 ```
 
@@ -217,6 +220,9 @@ docs/guides/getting-started.md:3: this heading has a guide badge, but only READM
 - **`the guide badge links to ..., which is not a file`.** The guide was renamed or moved. *Fix:* fix the path.
 - **`has no heading with that anchor`.** Usually the last hyphen is missing: a guide heading with a badge has an anchor that ends with `-`, as in `#greet-a-user-`. *Fix:* use the anchor that `check.heading_anchors` gives for the guide.
 - **`has no tested snippet badge that links to`.** The guide doesn't show the README example. *Fix:* show the same snippet file in the guide, with any line range, or link the README example to the guide that shows it.
+- **`the guide badge must name its guide`.** The alt text or the title of the guide badge is not `Guide: ` and the title of the guide. The badge of an earlier version has the alt text `Guide` and no title. *Fix:* copy the expected text from the message into both the `alt` and the `title` of the badge. The title of the guide is the text of its first `# ` line.
+- **`has no "# " title line`.** The guide has no title, so the badge cannot name it. *Fix:* start the guide with a `# ` title line.
+- **`this line links to a guide from an example`.** A `<sub>📖 [...](...)</sub>` line under a code block links to a guide. The guide badge on the example heading is the only link from an example to its guide. *Fix:* remove the line. If the example heading has no guide badge, add one that links to the same guide.
 - **`this heading has a guide badge, but only README example headings have one`.** A guide, release notes or a doc comment has a heading copied from the README. *Fix:* remove the guide badge from that heading.
 
 ## Diff blocks

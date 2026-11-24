@@ -83,8 +83,20 @@ pub const badge_end =
 pub const diff_badge_end =
   "\"><img align=\"right\" alt=\"Tested diff\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-diff-lightgreen.svg?style=flat-square\"></a>"
 
+/// The text of a guide badge after its link address, for a guide whose
+/// title is "Example guide" (the guide of `guide_path`).
 pub const guide_badge_end =
-  "\"><img align=\"right\" alt=\"Guide\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>"
+  "\"><img align=\"right\" alt=\"Guide: Example guide\" title=\"Guide: Example guide\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>"
+
+/// The text of a guide badge after its link address, with `name` in its
+/// alt text and its title.
+pub fn named_guide_badge_end(name: String) -> String {
+  "\"><img align=\"right\" alt=\""
+  <> name
+  <> "\" title=\""
+  <> name
+  <> "\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>"
+}
 
 /// A guide that shows the example of `snippet_path`. Its anchors are
 /// `example-guide`, `example-` and `café-au-lait`.
@@ -96,6 +108,10 @@ pub const other_guide_path = "docs/guides/other.md"
 
 /// A guide that cannot be read.
 pub const unreadable_guide_path = "docs/guides/locked.md"
+
+/// A guide that shows the example of `snippet_path` but has no `# ` title
+/// line. Its only `# ` line is in a code block. Its anchor is `example-`.
+pub const untitled_guide_path = "docs/guides/untitled.md"
 
 /// The file with a diff in the fake history: it changed between the tag
 /// 2.4.1 and the working tree.
@@ -200,6 +216,7 @@ fn read_fake_source(path: String) -> Result(String, simplifile.FileError) {
     #(tight_snippet_path, tight_snippet_source),
     #(guide_path, guide_source()),
     #(other_guide_path, "# Other guide\n\n## Setup\n"),
+    #(untitled_guide_path, untitled_guide_source()),
     #(workflow_path, workflow_source),
     #(script_path, script_source),
     #(output_path, output_source),
@@ -286,6 +303,22 @@ fn guide_source() -> String {
     "```",
     "",
     "## Café au lait",
+  ])
+}
+
+fn untitled_guide_source() -> String {
+  document([
+    "```bash illustration",
+    "# Not a title",
+    "```",
+    "",
+    heading(snippet_path <> "#L7-L9"),
+    "",
+    "```gleam",
+    "pub fn main() {",
+    "  io.println(\"hi\")",
+    "}",
+    "```",
   ])
 }
 

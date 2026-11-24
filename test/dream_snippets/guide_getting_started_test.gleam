@@ -24,7 +24,7 @@ const heading =
 
 /// The README heading that the guide shows, with both badges.
 const readme_heading =
-  "### Greet a user <a href=\"https://github.com/me/my_app/blob/0.1.0/test/snippets/guide_getting_started_greeting.gleam\"><img align=\"right\" alt=\"Tested snippet\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square\"></a> <a href=\"https://github.com/me/my_app/blob/0.1.0/docs/guides/getting-started.md#greet-a-user-\"><img align=\"right\" alt=\"Guide\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>"
+  "### Greet a user <a href=\"https://github.com/me/my_app/blob/0.1.0/test/snippets/guide_getting_started_greeting.gleam\"><img align=\"right\" alt=\"Tested snippet\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square\"></a> <a href=\"https://github.com/me/my_app/blob/0.1.0/docs/guides/getting-started.md#greet-a-user-\"><img align=\"right\" alt=\"Guide: Getting started\" title=\"Guide: Getting started\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>"
 
 /// The code of the snippet without its `////` module comment, as the docs
 /// show it.

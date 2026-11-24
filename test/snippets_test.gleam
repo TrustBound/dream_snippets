@@ -455,7 +455,7 @@ pub fn tests() -> TestSuite {
       }),
     ]),
     group("doc_parse_example_heading.example_heading", [
-      it("returns both badge addresses", fn() {
+      it("returns both badge addresses and the guide badge name", fn() {
         // Act
         let result = doc_parse_example_heading.example_heading()
 
@@ -466,7 +466,9 @@ pub fn tests() -> TestSuite {
           Ok(ExampleHeading(
             snippet_address: "https://github.com/me/my_app/blob/1.2.0/test/snippets/hello.gleam",
             guide_badge: GuideBadgeLink(
-              "https://github.com/me/my_app/blob/1.2.0/docs/guides/hello.md#say-hello",
+              address: "https://github.com/me/my_app/blob/1.2.0/docs/guides/hello.md#say-hello",
+              alt: "Guide: Hello",
+              title: Some("Guide: Hello"),
             ),
           )),
         )

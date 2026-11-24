@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the guide is a `.md` file under a guide directory, that the anchor is a
   heading of the guide, and that the guide links to the same snippet file.
   A heading outside the README must not have a guide badge.
+- The guide badge names its guide. Its `alt` and its `title` are both
+  `Guide: ` and the title of the guide, the text of its first `# ` line.
+  A badge with another name, or a guide with no `# ` title line, is a
+  problem. The message gives the expected text.
+- A `<sub>📖 [...](...)</sub>` line under a code block that links to a
+  guide is a problem, in every document. The guide badge on the example
+  heading is the only link from an example to its guide.
   `check.check_readme` checks a README, and `check.heading_anchors` gives
   the GitHub anchors of the headings of a document.
 - The `guides` setting lists the guide directories. The default is

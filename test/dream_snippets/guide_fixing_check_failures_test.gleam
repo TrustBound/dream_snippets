@@ -9,19 +9,19 @@ import dream_snippets/check.{
   type Project, type Reason, BlockDiffers, DiffLineNotFound, EmptyDiffBlock,
   ExampleNotInGuide, FilesAtTag, ForeignDependency, ForeignGuideLink,
   ForeignLink, GitUnavailable, GleamAddWithoutPackage, GuideAnchorNotFound,
-  GuideBadgeNotAllowed, HiddenGleamCode, HunkHeaderNotFound, LineRangePastEnd,
-  MalformedBadge, MalformedDiffBadge, MalformedGuideBadge, MalformedLineRange,
-  MalformedOldCodeBadge, MisnamedReleaseNotes, MissingBadgeHeading,
-  MissingCommandBadgeHeading, MissingDiffBadgeHeading, MissingDiffFileHeader,
-  MissingFile, MissingFileAtTag, MissingFileBadgeHeading, MissingGuideAnchor,
-  MissingGuideBadge, MissingGuideFile, MissingOldTag, MissingOutputBadgeHeading,
-  MissingReleaseTag, NoDiffForPath, NotAGuidePath, NotAnOlderRelease,
-  NotCompareLink, OldCodeBadgeWithOtherBadge, OldCodeDiffers, OldCodeNotAllowed,
-  OldTestedSourceLine, Problem, ReleaseNotBeforeVersion, ReversedLineRange,
-  UnclosedFence, UnknownPackage, UnlabelledFence, UnreadableFile,
-  UnsafeOldCodeLink, UnsupportedPackageArgument, UntestedFile, WorkingTree,
-  WrongDependencyRequirement, WrongDiffAnchor, WrongGuideTag, WrongNewTag,
-  WrongTag,
+  GuideBadgeNotAllowed, GuideTextLink, HiddenGleamCode, HunkHeaderNotFound,
+  LineRangePastEnd, MalformedBadge, MalformedDiffBadge, MalformedGuideBadge,
+  MalformedLineRange, MalformedOldCodeBadge, MisnamedReleaseNotes,
+  MissingBadgeHeading, MissingCommandBadgeHeading, MissingDiffBadgeHeading,
+  MissingDiffFileHeader, MissingFile, MissingFileAtTag, MissingFileBadgeHeading,
+  MissingGuideAnchor, MissingGuideBadge, MissingGuideFile, MissingOldTag,
+  MissingOutputBadgeHeading, MissingReleaseTag, NoDiffForPath, NotAGuidePath,
+  NotAnOlderRelease, NotCompareLink, OldCodeBadgeWithOtherBadge, OldCodeDiffers,
+  OldCodeNotAllowed, OldTestedSourceLine, Problem, ReleaseNotBeforeVersion,
+  ReversedLineRange, UnclosedFence, UnknownPackage, UnlabelledFence,
+  UnreadableFile, UnsafeOldCodeLink, UnsupportedPackageArgument, UntestedFile,
+  UntitledGuide, WorkingTree, WrongDependencyRequirement, WrongDiffAnchor,
+  WrongGuideBadgeName, WrongGuideTag, WrongNewTag, WrongTag,
 }
 import dream_snippets/config
 import dream_snippets/git.{GitFailed, GitNotFound}
@@ -234,6 +234,12 @@ pub fn tests() -> TestSuite {
           #(5, MissingGuideFile("docs/guides/greeting.md")),
           #(5, GuideAnchorNotFound(guide, "greet-a-user")),
           #(5, ExampleNotInGuide(guide, snippet)),
+          #(
+            5,
+            WrongGuideBadgeName(path: guide, expected: "Guide: Getting started"),
+          ),
+          #(5, UntitledGuide(guide)),
+          #(12, GuideTextLink),
         ])
         |> list.append(lines(guide, [#(3, GuideBadgeNotAllowed)]))
 

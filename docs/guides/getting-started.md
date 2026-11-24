@@ -181,7 +181,7 @@ README.md:5: this README example heading has no guide badge after its tested sni
 The guide badge comes after the tested snippet badge, with one space between them:
 
 ```markdown
-### Greet a user <a href="https://github.com/me/my_app/blob/0.1.0/test/snippets/guide_getting_started_greeting.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/me/my_app/blob/0.1.0/docs/guides/getting-started.md#greet-a-user-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
+### Greet a user <a href="https://github.com/me/my_app/blob/0.1.0/test/snippets/guide_getting_started_greeting.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/me/my_app/blob/0.1.0/docs/guides/getting-started.md#greet-a-user-"><img align="right" alt="Guide: Getting started" title="Guide: Getting started" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 ```
 
 The link names the guide file at the same tag, and `#greet-a-user-` is the anchor GitHub gives the guide heading `### Greet a user` with its badge. The badge leaves a space at the end of the heading text, and that space becomes the last hyphen. The check makes sure that the guide exists, that it has a heading with that anchor, and that it shows the same snippet file. With the guide badge in place:

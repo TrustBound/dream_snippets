@@ -212,29 +212,35 @@ const badge_end =
 const diff_badge_end =
   "\"><img align=\"right\" alt=\"Tested diff\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-diff-lightgreen.svg?style=flat-square\"></a>"
 
-/// The alt text of the guide badge image. The guide badge form is in
-/// `guide_badge_alt`, `guide_badge_image` and `guide_badge_end` only.
-const guide_badge_alt = "Guide"
+/// The start of the alt text and of the title of the guide badge image.
+/// The title of the guide follows it: the text of its `# ` line. The guide
+/// badge form is in `guide_badge_name_start`, `guide_badge_image_start`,
+/// `guide_badge_title_start` and `guide_badge_image_end` only.
+const guide_badge_name_start = "Guide: "
 
-/// The image address of the guide badge.
-const guide_badge_image =
-  "https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"
+/// The exact text between the link address of a guide badge and its alt
+/// text.
+const guide_badge_image_start = "\"><img align=\"right\" alt=\""
 
-/// The exact text after the link address of a guide badge, to the end of
-/// the heading. The guide badge comes after the tested snippet badge.
-const guide_badge_end =
-  "\"><img align=\"right\" alt=\""
-  <> guide_badge_alt
-  <> "\" src=\""
-  <> guide_badge_image
-  <> "\"></a>"
+/// The exact text between the alt text and the title of a guide badge.
+const guide_badge_title_start = "\" title=\""
+
+/// The exact text after the title of a guide badge, to the end of the
+/// heading. The guide badge comes after the tested snippet badge.
+const guide_badge_image_end =
+  "\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>"
 
 /// The text that shows that a heading has a tested snippet badge, in any
 /// form.
 const snippet_badge_marker = " alt=\"Tested snippet\""
 
-/// The text that shows that a heading has a guide badge, in any form.
-const guide_badge_marker = " alt=\"" <> guide_badge_alt <> "\""
+/// The text that shows that a heading has a guide badge, in any form. It
+/// is also in the alt text `Guide` of earlier versions.
+const guide_badge_marker = " alt=\"Guide"
+
+/// The start of a line that links to a guide from under an example, in
+/// place of the guide badge. See `is_guide_text_link`.
+const guide_text_link_start = "<sub>📖"
 
 /// The start of the alt text of the "code at an older release" badge. The
 /// old tag follows it. The badge form is in `old_code_badge_alt_start`,
@@ -420,6 +426,16 @@ pub type Reason {
   /// The guide file has no heading whose anchor is `anchor` (without its
   /// `#`). See `heading_anchors`.
   GuideAnchorNotFound(path: String, anchor: String)
+  /// The alt text or the title of the guide badge is not `expected`:
+  /// `Guide: ` and the title of the guide file at `path`.
+  WrongGuideBadgeName(path: String, expected: String)
+  /// The guide file at `path` has no `# ` title line outside code fences,
+  /// so the guide badge cannot name it.
+  UntitledGuide(path: String)
+  /// A `<sub>📖 [...](...)</sub>` line links to a guide from under an
+  /// example. The guide badge on the example heading is the only link from
+  /// an example to its guide.
+  GuideTextLink
   /// The guide file has no tested snippet badge that links to `snippet`,
   /// so it does not show the example.
   ExampleNotInGuide(path: String, snippet: String)
@@ -597,8 +613,10 @@ pub type GuideBadgeFound {
   /// The heading has no guide badge.
   NoGuideBadge
   /// The heading ends with the guide badge in the exact form, directly
-  /// after the tested snippet badge. `address` is its link address.
-  GuideBadgeLink(address: String)
+  /// after the tested snippet badge. `address` is its link address, `alt`
+  /// its alt text, and `title` its title, or `None` when it has none. The
+  /// check compares `alt` and `title` with the title of the guide.
+  GuideBadgeLink(address: String, alt: String, title: Option(String))
   /// The heading has a guide badge, but not in the exact form, or not
   /// directly after the tested snippet badge.
   BrokenGuideBadge
@@ -2023,6 +2041,18 @@ fn reason_text(reason: Reason, project: Project) -> String {
       <> " has no tested snippet badge that links to "
       <> snippet
       <> ", but the guide of a README example must show that example"
+    WrongGuideBadgeName(path:, expected:) ->
+      "the guide badge must name its guide: alt=\""
+      <> expected
+      <> "\" and title=\""
+      <> expected
+      <> "\", from the \"# \" title line of "
+      <> path
+    UntitledGuide(path:) ->
+      path
+      <> " has no \"# \" title line outside code blocks, but the guide badge names its guide by that title"
+    GuideTextLink ->
+      "this line links to a guide from an example; remove it, because the guide badge on the example heading is the link to the guide"
     MalformedOldCodeBadge ->
       "the code at an older release badge is not in the exact format, or the tag in its alt text or image is not the tag of its link; copy it from "
       <> project.badge_guide
@@ -2926,7 +2956,41 @@ fn check_block(
         Problem(file:, line: block.opening_line, reason: UnlabelledFence),
       ])
   }
-  add_report(problems_report(unclosed), report)
+  let text_links = guide_text_link_problems(after, context.project.guides, file)
+  add_report(problems_report(list.append(unclosed, text_links)), report)
+}
+
+/// The lines under a block, up to the next heading or code fence, that
+/// link to a guide in place of the guide badge (see `is_guide_text_link`).
+fn guide_text_link_problems(
+  after: List(Line),
+  guides: List(String),
+  file: String,
+) -> List(Problem) {
+  after
+  |> list.take_while(fn(line) {
+    result.is_error(heading_text(string.trim_start(line.text)))
+    && option.is_none(parse_fence_opener(line.text))
+  })
+  |> list.filter(fn(line) { is_guide_text_link(line.text, guides) })
+  |> list.map(fn(line) {
+    Problem(file:, line: line.number, reason: GuideTextLink)
+  })
+}
+
+/// Tells whether a line is a small link line to a guide, as
+/// `<sub>📖 [Guide](https://github.com/me/my_app/blob/main/docs/guides/hello.md)</sub>`:
+/// it starts with `<sub>📖`, ends with `</sub>`, and links to a path under
+/// one of the guide directories.
+fn is_guide_text_link(text: String, guides: List(String)) -> Bool {
+  let trimmed = string.trim(text)
+  string.starts_with(trimmed, guide_text_link_start)
+  && string.ends_with(trimmed, "</sub>")
+  && list.any(guides, fn(directory) {
+    let directory = remove_trailing_slashes(directory) <> "/"
+    string.contains(trimmed, "](" <> directory)
+    || string.contains(trimmed, "/" <> directory)
+  })
 }
 
 /// The problems of a file or command block. A block under a heading with
@@ -3218,11 +3282,13 @@ pub fn parse_diff_badge_heading(text: String) -> Result(String, Reason) {
 ///   // Returns Ok(ExampleHeading(
 ///   //   snippet_address: "https://github.com/me/my_app/blob/1.2.0/test/snippets/hello.gleam",
 ///   //   guide_badge: GuideBadgeLink(
-///   //     "https://github.com/me/my_app/blob/1.2.0/docs/guides/hello.md#say-hello",
+///   //     address: "https://github.com/me/my_app/blob/1.2.0/docs/guides/hello.md#say-hello",
+///   //     alt: "Guide: Hello",
+///   //     title: Some("Guide: Hello"),
 ///   //   ),
 ///   // ))
 ///   check.parse_example_heading(
-///     "### Say hello <a href=\"https://github.com/me/my_app/blob/1.2.0/test/snippets/hello.gleam\"><img align=\"right\" alt=\"Tested snippet\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square\"></a> <a href=\"https://github.com/me/my_app/blob/1.2.0/docs/guides/hello.md#say-hello\"><img align=\"right\" alt=\"Guide\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>",
+///     "### Say hello <a href=\"https://github.com/me/my_app/blob/1.2.0/test/snippets/hello.gleam\"><img align=\"right\" alt=\"Tested snippet\" src=\"https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square\"></a> <a href=\"https://github.com/me/my_app/blob/1.2.0/docs/guides/hello.md#say-hello\"><img align=\"right\" alt=\"Guide: Hello\" title=\"Guide: Hello\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>",
 ///   )
 /// }
 /// ```
@@ -3254,12 +3320,28 @@ fn example_heading(
 }
 
 /// Reads the last badge of a heading, which has the guide badge alt text.
+/// The badge is the address, `guide_badge_image_start`, the alt text, then
+/// `guide_badge_title_start` and the title when it has one, and
+/// `guide_badge_image_end`. The address, the alt text and the title have
+/// no `"`.
 fn guide_badge_from(badge: String) -> GuideBadgeFound {
-  let address = remove_suffix(badge, guide_badge_end) |> result.unwrap("")
-  case address == "" || string.contains(address, "\"") {
-    True -> BrokenGuideBadge
-    False -> GuideBadgeLink(address)
+  let parsed = {
+    use before_end <- result.try(remove_suffix(badge, guide_badge_image_end))
+    use #(address, names) <- result.try(string.split_once(
+      before_end,
+      guide_badge_image_start,
+    ))
+    let #(alt, title) = case string.split_once(names, guide_badge_title_start) {
+      Ok(#(alt, title)) -> #(alt, Some(title))
+      Error(Nil) -> #(names, None)
+    }
+    let parts = [address, alt, option.unwrap(title, "")]
+    case address == "" || list.any(parts, string.contains(_, "\"")) {
+      True -> Error(Nil)
+      False -> Ok(GuideBadgeLink(address:, alt:, title:))
+    }
   }
+  result.unwrap(parsed, BrokenGuideBadge)
 }
 
 fn guide_badge_elsewhere(heading: String) -> GuideBadgeFound {
@@ -3716,9 +3798,20 @@ fn guide_badge_reasons(
     GuideBadgeForbidden, _ -> [GuideBadgeNotAllowed]
     GuideBadgeRequired, NoGuideBadge -> [MissingGuideBadge]
     GuideBadgeRequired, BrokenGuideBadge -> [MalformedGuideBadge]
-    GuideBadgeRequired, GuideBadgeLink(address:) ->
-      guide_link_reasons(address, snippet, rules.release, context)
+    GuideBadgeRequired, GuideBadgeLink(address:, alt:, title:) ->
+      guide_link_reasons(
+        address,
+        GuideBadgeName(alt:, title:),
+        snippet,
+        rules.release,
+        context,
+      )
   }
+}
+
+/// The alt text and the title of a guide badge.
+type GuideBadgeName {
+  GuideBadgeName(alt: String, title: Option(String))
 }
 
 /// Checks a guide badge link. The tag is checked on its own. The path, the
@@ -3726,6 +3819,7 @@ fn guide_badge_reasons(
 /// guide are checked in order, each only when the one before it passed.
 fn guide_link_reasons(
   address: String,
+  name: GuideBadgeName,
   snippet: SnippetLink,
   release: DocumentRelease,
   context: CheckContext,
@@ -3735,8 +3829,7 @@ fn guide_link_reasons(
     Ok(link) ->
       list.append(
         guide_tag_reasons(link, release.tag),
-        check_guide(link, snippet, context)
-          |> result_to_reasons,
+        check_guide(link, name, snippet, context),
       )
   }
 }
@@ -3755,11 +3848,29 @@ fn result_to_reasons(checked: Result(Nil, Reason)) -> List(Reason) {
   }
 }
 
+/// Checks the guide file of a guide badge. When the file can be read, the
+/// section of the example and the name of the badge are checked on their
+/// own.
 fn check_guide(
   link: GuideLink,
+  name: GuideBadgeName,
   snippet: SnippetLink,
   context: CheckContext,
-) -> Result(Nil, Reason) {
+) -> List(Reason) {
+  case read_guide(link, context) {
+    Error(reason) -> [reason]
+    Ok(guide) ->
+      list.append(
+        check_guide_section(guide, link, snippet, context) |> result_to_reasons,
+        guide_name_reasons(guide, link.path, name),
+      )
+  }
+}
+
+fn read_guide(
+  link: GuideLink,
+  context: CheckContext,
+) -> Result(String, Reason) {
   let guides = context.project.guides
   use Nil <- result.try(require(
     is_guide_path(link.path, guides),
@@ -3769,10 +3880,16 @@ fn check_guide(
     link.anchor != "",
     MissingGuideAnchor(link.path),
   ))
-  use guide <- result.try(
-    context.read_source(link.path)
-    |> result.map_error(fn(error) { guide_error_reason(link.path, error) }),
-  )
+  context.read_source(link.path)
+  |> result.map_error(fn(error) { guide_error_reason(link.path, error) })
+}
+
+fn check_guide_section(
+  guide: String,
+  link: GuideLink,
+  snippet: SnippetLink,
+  context: CheckContext,
+) -> Result(Nil, Reason) {
   use Nil <- result.try(require(
     list.contains(heading_anchors(guide), decode_anchor(link.anchor)),
     GuideAnchorNotFound(path: link.path, anchor: link.anchor),
@@ -3781,6 +3898,38 @@ fn check_guide(
     shows_snippet(guide, snippet.path, context.project.repository),
     ExampleNotInGuide(path: link.path, snippet: snippet.path),
   )
+}
+
+/// The problem of the name of a guide badge: its alt text and its title
+/// must both be `Guide: ` and the title of the guide.
+fn guide_name_reasons(
+  guide: String,
+  path: String,
+  name: GuideBadgeName,
+) -> List(Reason) {
+  case guide_title(guide) {
+    Error(Nil) -> [UntitledGuide(path)]
+    Ok(title) -> {
+      let expected = guide_badge_name_start <> title
+      case name.alt == expected && name.title == Some(expected) {
+        True -> []
+        False -> [WrongGuideBadgeName(path:, expected:)]
+      }
+    }
+  }
+}
+
+/// The title of a guide: the text of its first `# ` line outside code
+/// fences.
+fn guide_title(markdown: String) -> Result(String, Nil) {
+  numbered_lines(markdown, 1)
+  |> prose_lines([])
+  |> list.find_map(fn(line) {
+    case string.starts_with(line.text, "# ") {
+      True -> heading_text(line.text)
+      False -> Error(Nil)
+    }
+  })
 }
 
 fn require(condition: Bool, reason: Reason) -> Result(Nil, Reason) {

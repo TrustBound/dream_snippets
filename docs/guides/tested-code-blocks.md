@@ -32,10 +32,10 @@ Replace `<owner>`, `<repo>`, `<version>`, `<path>` and the heading text. Keep ev
 ### Encode a user <a href="https://github.com/<owner>/<repo>/blob/<version>/<path>"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 ```
 
-**The tested snippet badge and the guide badge**, for an example in the root `README.md`. The guide badge comes second, after one space. `<guide>` is a `.md` file under `docs/guides`, and `<anchor>` is the anchor of the guide heading that shows the same snippet, so it ends with a hyphen:
+**The tested snippet badge and the guide badge**, for an example in the root `README.md`. The guide badge comes second, after one space. `<guide>` is a `.md` file under `docs/guides`, and `<anchor>` is the anchor of the guide heading that shows the same snippet, so it ends with a hyphen. `<guide title>` is the text of the first `# ` line of the guide:
 
 ```markdown
-### Encode a user <a href="https://github.com/<owner>/<repo>/blob/<version>/<path>"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/<owner>/<repo>/blob/<version>/<guide>#<anchor>"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
+### Encode a user <a href="https://github.com/<owner>/<repo>/blob/<version>/<path>"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/<owner>/<repo>/blob/<version>/<guide>#<anchor>"><img align="right" alt="Guide: <guide title>" title="Guide: <guide title>" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 ```
 
 **The tested diff badge**, for a ```` ```diff ```` block. `<old tag>` is an earlier release tag, the new tag is `<version>`, and `<digest>` is the SHA-256 hex digest of the path of the file in the block (`printf '%s' <path> | shasum -a 256`):
@@ -174,7 +174,7 @@ A few details:
 An example in the root `README.md` carries two badges: the tested snippet badge, then one space and the guide badge. Both images float right, so the guide badge shows to the left of the tested snippet badge. The guide badge sends a reader from the short example to the section that explains it:
 
 ```markdown
-### Greet a user <a href="https://github.com/me/my_app/blob/0.1.0/test/snippets/guide_getting_started_greeting.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/me/my_app/blob/0.1.0/docs/guides/getting-started.md#greet-a-user-"><img align="right" alt="Guide" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
+### Greet a user <a href="https://github.com/me/my_app/blob/0.1.0/test/snippets/guide_getting_started_greeting.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/me/my_app/blob/0.1.0/docs/guides/getting-started.md#greet-a-user-"><img align="right" alt="Guide: Getting started" title="Guide: Getting started" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
 ```
 
 The check wants these things of the guide badge:
@@ -184,6 +184,9 @@ The check wants these things of the guide badge:
 - The guide file exists.
 - The link ends with `#<anchor>`, and the anchor is the anchor of a heading in the guide.
 - The guide has a tested snippet badge that links to the same snippet file. Its line range can be different.
+- The `alt` and the `title` of the badge image are both `Guide: ` and the title of the guide. The title of the guide is the text of its first `# ` line outside code blocks. Here the guide starts with `# Getting started`, so the badge has `alt="Guide: Getting started"` and `title="Guide: Getting started"`.
+
+The guide badge is the only link from an example to its guide. A `<sub>📖 [...](...)</sub>` line under a code block that links to a guide is a problem, in every document. Remove the line, and put the guide badge on the example heading.
 
 Only the root README has guide badges. A heading in a guide, the changelog, release notes or a doc comment has only the tested snippet badge, and a `diff` heading or a heading of code at an older release has none.
 

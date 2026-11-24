@@ -27,7 +27,7 @@ pub const snippet_badge_end =
 
 /// The text of a guide badge after its link address.
 pub const guide_badge_end =
-  "\"><img align=\"right\" alt=\"Guide\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>"
+  "\"><img align=\"right\" alt=\"Guide: Getting started\" title=\"Guide: Getting started\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>"
 
 /// Writes the example project with `gleam.toml`, `src/my_app.gleam` and
 /// the files, and checks it. A file in `files` with the path of a base

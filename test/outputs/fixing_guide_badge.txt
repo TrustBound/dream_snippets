@@ -7,4 +7,7 @@ README.md:5: the guide badge link to docs/guides/getting-started.md has no #<anc
 README.md:5: the guide badge links to docs/guides/greeting.md, which is not a file in this repository
 README.md:5: the guide badge links to the anchor #greet-a-user, but docs/guides/getting-started.md has no heading with that anchor
 README.md:5: docs/guides/getting-started.md has no tested snippet badge that links to test/snippets/guide_getting_started_greeting.gleam, but the guide of a README example must show that example
+README.md:5: the guide badge must name its guide: alt="Guide: Getting started" and title="Guide: Getting started", from the "# " title line of docs/guides/getting-started.md
+README.md:5: docs/guides/getting-started.md has no "# " title line outside code blocks, but the guide badge names its guide by that title
+README.md:12: this line links to a guide from an example; remove it, because the guide badge on the example heading is the link to the guide
 docs/guides/getting-started.md:3: this heading has a guide badge, but only README example headings have one; here the heading has only the tested snippet badge

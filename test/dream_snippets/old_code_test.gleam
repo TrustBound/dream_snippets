@@ -317,7 +317,7 @@ fn badge_tests() -> UnitNode {
       // Arrange
       let heading =
         old_code_heading(old_code_path)
-        <> " <a href=\"https://github.com/TrustBound/dream/blob/3.0.0/docs/guides/example.md#example-\"><img align=\"right\" alt=\"Guide\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>"
+        <> " <a href=\"https://github.com/TrustBound/dream/blob/3.0.0/docs/guides/example.md#example-\"><img align=\"right\" alt=\"Guide: Example guide\" title=\"Guide: Example guide\" src=\"https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square\"></a>"
 
       // Act
       let problems = check_guide(gleam_document(heading, old_lines))

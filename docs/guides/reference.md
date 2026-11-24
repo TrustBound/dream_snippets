@@ -161,7 +161,9 @@ The check fails when one of these is true. Each one has its own message, and [Fi
 - A README example has no guide badge, or the guide badge is not in the exact format or place.
 - The guide badge link is not a link of the repository at the release tag, is not a `.md` file under a guide directory, or has no anchor.
 - The guide file does not exist, has no heading with the anchor, or does not link to the snippet of the example.
+- The `alt` or the `title` of the guide badge is not `Guide: ` and the title of the guide, or the guide has no `# ` title line.
 - A heading outside the README has a guide badge.
+- A `<sub>📖 [...](...)</sub>` line under a code block, before the next heading or code fence, links to a guide. This rule is for every document.
 
 **Diff blocks**
 
