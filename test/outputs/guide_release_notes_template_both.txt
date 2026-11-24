@@ -1,0 +1,2 @@
+releases/release-0.2.0.md:27: "## Upgrading" and "## Installing" are both in the file, but the template allows only one of them; see "Release notes template" in https://hexdocs.pm/dream_snippets/guides/release-notes-template.html
+0 blocks and 0 diff blocks checked in 2 files, 1 problem; 0 file blocks, 0 command blocks and 0 output blocks checked; 0 illustration blocks

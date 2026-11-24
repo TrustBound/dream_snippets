@@ -1,0 +1,1 @@
+error: docs is set in [tools.dream_snippets] in gleam.toml, but it does not exist

@@ -1,0 +1,3 @@
+docs/guides/usage.md:4: this line looks like Gleam code in a text illustration code fence; put Gleam code in a gleam block with the tested snippet badge
+docs/guides/usage.md:8: this code fence has no language; name the language of the block and prove it, or mark it as an illustration with "```text illustration"; see https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+docs/guides/usage.md:12: this code fence has no closing fence

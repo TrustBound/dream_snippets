@@ -1,0 +1,10 @@
+[tools.dream_snippets]
+markdown = ["README.md", "SECURITY.md", "docs", "examples"]
+changelog = ["CHANGELOG.md"]
+release_notes = ["releases"]
+gleam_source = ["src"]
+checked_from_version = "0.0.0"
+guides = ["docs/guides"]
+tested_files = ["test", ".github"]
+badge_guide = "https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html"
+release_notes_guide = "https://hexdocs.pm/dream_snippets/guides/release-notes-template.html"

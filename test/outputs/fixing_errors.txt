@@ -1,0 +1,13 @@
+error: gleam.toml is not valid TOML: found m where value was expected
+error: gleam.toml sets the key name twice
+error: gleam.toml has no version = "..." line before its first [section]
+error: gleam.toml has no name = "..." line before its first [section]
+error: gleam.toml has no repository = { type = "github", user = "...", repo = "..." }
+error: gleam.toml names a gitlab repository; the badges link at GitHub, so the repository type must be github
+error: tools.dream_snippets.markdown in gleam.toml must be an array of strings, but its TOML type is String
+error: tools.dream_snippets.markdown in gleam.toml must be an array of strings
+error: tools.dream_snippets.guide in gleam.toml is not a setting; the settings are markdown, changelog, release_notes, gleam_source, checked_from_version, guides, badge_guide, release_notes_guide, tested_files
+error: tools.dream_snippets.checked_from_version in gleam.toml is "1.0", which is not a major.minor.patch version
+error: examples is set in [tools.dream_snippets] in gleam.toml, but it does not exist
+error: Cannot read gleam.toml: No such file or directory
+error: Cannot list docs: Permission denied

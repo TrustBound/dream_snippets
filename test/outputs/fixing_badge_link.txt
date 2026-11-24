@@ -1,0 +1,4 @@
+docs/guides/getting-started.md:5: the badge link https://github.com/someone/my_app/blob/0.2.0/test/snippets/guide_getting_started_greeting.gleam does not point at a file in https://github.com/me/my_app
+docs/guides/getting-started.md:5: the badge link uses the tag 0.1.0, but this file must link at the tag 0.2.0 (the docs of my_app use the version in gleam.toml)
+docs/guides/getting-started.md:5: the badge links to test/snippets/greeting.gleam, which is not a file in this repository
+docs/guides/getting-started.md:5: cannot read test/snippets/guide_getting_started_greeting.gleam: Permission denied

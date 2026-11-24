@@ -1,0 +1,32 @@
+name = "dream_snippets"
+version = "1.0.0"
+description = "Checks that every code block in a Gleam project's docs matches a tested snippet file"
+licences = ["MIT"]
+repository = { type = "github", user = "TrustBound", repo = "dream_snippets" }
+links = [
+    { title = "Documentation", href = "https://hexdocs.pm/dream_snippets" },
+    { title = "GitHub", href = "https://github.com/TrustBound/dream_snippets" },
+]
+
+[documentation]
+pages = [
+    { title = "Getting started", path = "guides/getting-started.html", source = "./docs/guides/getting-started.md" },
+    { title = "Tested code blocks", path = "guides/tested-code-blocks.html", source = "./docs/guides/tested-code-blocks.md" },
+    { title = "Fix a failed check", path = "guides/fixing-check-failures.html", source = "./docs/guides/fixing-check-failures.md" },
+    { title = "Show an API change in an upgrade guide", path = "guides/upgrade-guides.html", source = "./docs/guides/upgrade-guides.md" },
+    { title = "Release notes template", path = "guides/release-notes-template.html", source = "./docs/guides/release-notes-template.md" },
+    { title = "Use it from Gleam", path = "guides/use-from-gleam.html", source = "./docs/guides/use-from-gleam.md" },
+    { title = "Settings and checks reference", path = "guides/reference.html", source = "./docs/guides/reference.md" },
+]
+
+[dependencies]
+gleam_stdlib = ">= 1.0.0 and < 2.0.0"
+simplifile = ">= 2.4.0 and < 3.0.0"
+tom = ">= 2.0.2 and < 3.0.0"
+
+[dev-dependencies]
+dream_test = ">= 3.0.0 and < 4.0.0"
+
+[tools.dream_snippets]
+markdown = ["README.md", "SECURITY.md", "CONTRIBUTING.md", "docs"]
+tested_files = ["test", ".github", "scripts", "Makefile", "gleam.toml"]

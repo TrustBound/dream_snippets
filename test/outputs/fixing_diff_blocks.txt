@@ -1,0 +1,13 @@
+docs/guides/upgrading.md:19: this diff block has no heading with the tested diff badge directly above it (one blank line between is allowed)
+docs/guides/upgrading.md:19: the tested diff badge is not in the exact format; copy it from https://hexdocs.pm/dream_snippets/guides/tested-code-blocks.html
+docs/guides/upgrading.md:19: the diff badge link https://github.com/me/my_app/compare/0.1.0..0.2.0 is not https://github.com/me/my_app/compare/<old tag>...<new tag>#diff-<digest>
+docs/guides/upgrading.md:19: the compare link ends at the tag 0.1.1, but this file must use the new tag 0.2.0 (the docs of my_app use the version in gleam.toml)
+docs/guides/upgrading.md:19: the diff block does not start with "--- a/<path>" and "+++ b/<path>" for one path of letters, digits and . _ - /
+docs/guides/upgrading.md:19: the diff block has no diff lines after its file header
+docs/guides/upgrading.md:19: the compare link anchor is not the one for src/my_app.gleam; use #diff-dc300fec45bded4a328557d8cdb35d83594380337bd562985800e8086dc62ebd
+docs/guides/upgrading.md:19: the tag 0.1.0 is not in this clone; fetch the tags with "git fetch --tags" (a shallow clone has none)
+docs/guides/upgrading.md:19: cannot run git: git is not on the PATH
+docs/guides/upgrading.md:19: cannot run git: git stopped with exit status 128
+docs/guides/upgrading.md:19: src/my_app.gleam has no changes since the tag 0.1.0
+docs/guides/upgrading.md:22: the hunk header @@ -1,4 +1,11 @@ is not a hunk header of the real diff, or it is out of order
+docs/guides/upgrading.md:24: this line is not in "git diff 0.1.0 -- src/my_app.gleam" at this place; a diff block shows lines of the real diff, in order and contiguous within a hunk
