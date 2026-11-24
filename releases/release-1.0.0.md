@@ -1,6 +1,6 @@
 # dream_snippets 1.0.0 Release Notes
 
-**Release Date:** not released yet (draft)
+**Release Date:** 2026-11-24
 
 This is the first release of `dream_snippets`. It checks that each code block in the docs of a Gleam project is proven: each Gleam block is an exact copy of a snippet file that the project's tests compile and run, and each other block is proven in the way that fits its kind. A code example in the docs can then not be wrong without a failed check.
 
@@ -118,7 +118,7 @@ checked_from_version = \"1.0.0\"
 
 ## Testing
 
-- 421 tests run, 0 failed, 100.0% line coverage (1295 of 1295 lines), in about 6.2 seconds by the test runner (`make test`, Apple M1 Max, OTP 29, Gleam 1.19.2, load average about 4 from other work)
+- 433 tests run, 0 failed, 100.0% line coverage (1333 of 1333 lines), in about 6.2 seconds by the test runner (`make test`, Apple M1 Max, OTP 29, Gleam 1.19.2, load average about 13 from other work)
 
 ## Installing
 

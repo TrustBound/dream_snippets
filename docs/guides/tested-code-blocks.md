@@ -244,7 +244,7 @@ repository = { type = "github", user = "me", repo = "my_app" }
 
 The check compares the block with the file byte for byte, as it does for a Gleam block. The file must be one of the `tested_files` paths of the project, or under one of them. The default `["test", ".github"]` holds the files of the tests and the workflows of CI. This package also lists the scripts that CI runs, its `Makefile` and its own `gleam.toml`, which every build reads:
 
-### The settings of this package <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/gleam.toml#L31-L33"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
+### The settings of this package <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/gleam.toml#L30-L32"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a>
 
 ```toml
 [tools.dream_snippets]

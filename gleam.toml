@@ -25,8 +25,7 @@ simplifile = ">= 2.4.0 and < 3.0.0"
 tom = ">= 2.0.2 and < 3.0.0"
 
 [dev-dependencies]
-# Switched to a Hex version range once it is published.
-dream_test = { git = "https://github.com/TrustBound/dream_test.git", ref = "1639959578a14ae3577f8e3ae5cac058f933aa53" }
+dream_test = ">= 3.0.0 and < 4.0.0"
 
 [tools.dream_snippets]
 markdown = ["README.md", "SECURITY.md", "CONTRIBUTING.md", "docs"]
