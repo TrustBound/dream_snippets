@@ -20,7 +20,7 @@
 
 ## What is Dream Snippets?
 
-Dream Snippets is the check that stops a code example in your docs from being wrong without anyone noticing. Each Gleam code block in a README, a guide or a doc comment must be a byte-for-byte copy of a snippet file that your tests compile and run, and the check fails the build when one differs. It reads the repository and the release tag from `gleam.toml`, so it needs no setup, and it works in any Gleam project on GitHub.
+Dream Snippets keeps the examples in your docs true. Every example a reader sees is code your tests actually run. The day one stops working, your build tells you, before a reader copies it into their project. There's nothing to set up: point it at your project and it checks everything.
 
 ## Features
 
