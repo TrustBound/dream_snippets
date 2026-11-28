@@ -1,6 +1,6 @@
 name = "dream_snippets"
 version = "1.0.0"
-description = "Checks that every code block in a Gleam project's docs matches a tested snippet file"
+description = "Every code block in your docs, proven by a test"
 licences = ["MIT"]
 repository = { type = "github", user = "TrustBound", repo = "dream_snippets" }
 links = [

@@ -1,7 +1,7 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/TrustBound/dream/main/ricky_and_lucy.png" alt="Ricky Moony and Lucy, a moon shaped mascot for Dream with the star shaped mascot for Gleam, each with cute cartoon eyes and a smile" width="200">
 
-<b>Checks that every code block in a Gleam project's docs matches a tested snippet file.</b>
+<b>Every code block in your docs, proven by a test</b>
 
 </div>
 
@@ -18,35 +18,53 @@
 
 <br />
 
-# dream_snippets
+## What is Dream Snippets?
 
-A code block with no tested snippet can be wrong, and nobody finds out until a reader tries it. dream_snippets is the check that every [Dream](https://github.com/TrustBound/dream) repository runs in CI to stop that: each Gleam code block in the README, the guides and the doc comments must be a copy of a snippet file that the tests compile and run. It works in any Gleam project on GitHub.
-
-Sent here by a "not in the exact format" message? Copy the heading and badges from [Copy a badge](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md#copy-a-badge) in the Tested code blocks guide.
+Dream Snippets is the check that stops a code example in your docs from being wrong without anyone noticing. Each Gleam code block in a README, a guide or a doc comment must be a byte-for-byte copy of a snippet file that your tests compile and run, and the check fails the build when one differs. It reads the repository and the release tag from `gleam.toml`, so it needs no setup, and it works in any Gleam project on GitHub.
 
 ## Features
 
-- ✅ Proves every fenced code block in Markdown docs and in `///` and `////` doc comments, each in the way that fits its kind, and skips none in silence
-- ✅ Checks each `gleam` block in Markdown docs and in `///` and `////` doc comments
-- ✅ Compares the block with the linked snippet file, or a line range of it, byte for byte
-- ✅ Checks that each README example links to the guide section that shows it
-- ✅ Compares each file, command and output block with the file that the tests or CI use, from the `tested_files` setting
-- ✅ Proves `gleam add` lines and `toml` dependency lines with `gleam.toml`, with no file
-- ✅ Counts the blocks marked as an illustration, and finds Gleam code hidden in them
-- ✅ Checks `diff` blocks against the real `git diff` from a release tag
-- ✅ Checks code at an older release against the file at that release tag
-- ✅ Checks the release notes and changelog sections of an older release against the files at its tag, so a version bump needs no change to them
-- ✅ Checks that release notes follow the release notes template
-- ✅ Reads the repository and the release tag from `gleam.toml`, so it needs no setup
-- ✅ No network access
+### Every block is proven
 
-## Installation
+Each kind of block is proven in the way that fits it, and none is skipped in silence. [Read more](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md#which-proof-to-use).
 
-```bash
-gleam add --dev dream_snippets
-```
+| Feature                           | What you get                                                                                                                      |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 🧪 **Gleam blocks**               | Compared byte for byte with the linked snippet file, or a line range of it, in Markdown docs and in `///` and `////` doc comments |
+| 📄 **Files, commands and output** | Compared with the file that the tests or CI use, from the `tested_files` setting                                                  |
+| 📦 **Packages**                   | `gleam add` lines and `toml` dependency lines are proven with `gleam.toml`, with no file                                          |
+| 🕵️ **Illustrations**              | Blocks marked as an illustration are counted, and Gleam code hidden in them is found                                              |
 
-## Quick Start
+### README examples
+
+Each README example links to the guide section that shows it. [Read more](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md#step-4-add-an-example-to-the-readme).
+
+| Feature                            | What you get                                                                           |
+| ---------------------------------- | -------------------------------------------------------------------------------------- |
+| 🏷️ **Standard heading and badges** | The check finds a README example by its heading and its two badges                     |
+| 🔗 **Guide link**                  | The check fails when a README example does not link to the guide section that shows it |
+
+### Upgrades and releases
+
+Old code and release notes are checked against git. [Read more](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/upgrade-guides.md).
+
+| Feature                       | What you get                                                                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 🔀 **Diff blocks**            | Checked against the real `git diff` from a release tag                                                                                           |
+| 🕰️ **Older releases**         | Code, release notes and changelog sections of an older release are compared with the files at its tag, so a version bump needs no change to them |
+| 📝 **Release notes template** | Checks that release notes follow the template                                                                                                    |
+
+### Easy to run
+
+One command in CI, or one Gleam call in your tests. [Read more](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/use-from-gleam.md).
+
+| Feature           | What you get                                                                              |
+| ----------------- | ----------------------------------------------------------------------------------------- |
+| ⌨️ **One command** | `gleam run -m dream_snippets` prints one line for each problem and stops with exit code 1 |
+| 🧰 **From Gleam** | `check_project` returns the result, for your tests or your own tools                      |
+| 🔌 **No network** | The check reads files and git only                                                        |
+
+## A Quick Example
 
 Run the check from the project root:
 
@@ -56,20 +74,17 @@ Run the check from the project root:
 gleam run -m dream_snippets
 ```
 
-It prints one line for each problem and a summary line, and it stops with exit code 1 when it finds a problem. The same check is one Gleam call:
+**Run this:** `gleam run -m dream_snippets` → one line for each problem and a summary line such as `32 blocks and 0 diff blocks checked in 9 files, 0 problems`, and exit code 1 when there is a problem.
 
-### Check a project and read what the command prints <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/test/snippets/doc_check_project.gleam"><img align="right" alt="Tested snippet" src="https://img.shields.io/badge/%F0%9F%A7%AA_tested-snippet-lightgreen.svg?style=flat-square"></a> <a href="https://github.com/TrustBound/dream_snippets/blob/1.0.0/docs/guides/use-from-gleam.md#check-a-project-and-read-what-the-command-prints-"><img align="right" alt="Guide: Use it from Gleam" title="Guide: Use it from Gleam" src="https://img.shields.io/badge/%F0%9F%93%96_read-guide-blue.svg?style=flat-square"></a>
+## Installation
 
-```gleam
-import dream_snippets
-
-pub fn summary_of(directory: String) -> List(String) {
-  let output = dream_snippets.output(dream_snippets.check_project(directory))
-  output.standard_output
-}
+```sh
+gleam add --dev dream_snippets
 ```
 
 ## Guides
+
+Sent here by a "not in the exact format" message? Copy the heading and badges from [Copy a badge](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md#copy-a-badge) in the Tested code blocks guide.
 
 - [Getting started](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/getting-started.md): prove the code examples of a project, from the first snippet to the check in CI
 - [Tested code blocks](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/tested-code-blocks.md): every badge to copy, line ranges, doc comments, README examples and their guide badge
@@ -78,29 +93,24 @@ pub fn summary_of(directory: String) -> List(String) {
 - [Release notes template](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/release-notes-template.md): write release notes that follow the template, with a complete example
 - [Use it from Gleam](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/use-from-gleam.md): run the check from your tests or your own tools
 - [Settings and checks reference](https://github.com/TrustBound/dream_snippets/blob/main/docs/guides/reference.md): every setting with its default, and every check
+- [API reference](https://hexdocs.pm/dream_snippets): every module and function on HexDocs
 
-## Design Principles
+## Requirements
 
-dream_snippets follows Dream's [design principles](https://github.com/TrustBound/dream/blob/release/3.0.0/docs/reference/design-principles.md) and [contributing guide](https://github.com/TrustBound/dream/blob/release/3.0.0/docs/contributing/contributing.md).
+- Gleam 1.19.2 or newer on Erlang/OTP 28 (the versions CI uses).
+- `git` on the `PATH` for the checks of diff blocks and older releases.
+- A GitHub repository, so the check can read the repository and the release tag from `gleam.toml`.
 
 ## About Dream
 
 [Dream](https://github.com/TrustBound/dream) is a collection of Gleam packages for building production web applications. Each package implements its standards completely, shares the same naming and style as the others, and is fully tested. TrustBound builds Dream for its own production systems and shares it in the hope that it helps yours.
 
-dream_snippets works on its own. You don't need the rest of Dream to use it.
+Dream Snippets works on its own. You don't need the rest of Dream to use it.
 
 ## Contributing
 
-See the [Contributing Guide](https://github.com/TrustBound/dream_snippets/blob/main/CONTRIBUTING.md) for guidelines.
-
----
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
 MIT — see [LICENSE.md](https://github.com/TrustBound/dream_snippets/blob/main/LICENSE.md)
-
----
-
-<div align="center">
-  <sub>Built in Gleam, on the BEAM, by the <a href="https://github.com/trustbound/dream">Dream Team</a> ❤️</sub>
-</div>
