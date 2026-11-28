@@ -85,7 +85,9 @@ dream_snippets follows Dream's [design principles](https://github.com/TrustBound
 
 ## About Dream
 
-This package was first built inside the [Dream](https://github.com/TrustBound/dream) web toolkit, as the check behind its tested docs. It is standalone and can be used in any Gleam project. It follows Dream's design principles and will be maintained as part of the Dream ecosystem.
+[Dream](https://github.com/TrustBound/dream) is a collection of Gleam packages for building production web applications. Each package implements its standards completely, shares the same naming and style as the others, and is fully tested. TrustBound builds Dream for its own production systems and shares it in the hope that it helps yours.
+
+dream_snippets works on its own. You don't need the rest of Dream to use it.
 
 ## Contributing
 
